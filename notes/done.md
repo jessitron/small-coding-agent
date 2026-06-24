@@ -25,3 +25,15 @@ Completed landings, newest at the bottom. (In-repo tracking; see `SEAMAP.md` §T
       surface. Mounts `~/.aws` read-only (pattern ready for Bedrock/Secrets;
       not exercised by "hi" yet).
   - Verified: image is `arm64/linux`; both smoke scripts PASS (reply "hi").
+
+- **Deploy to Bedrock AgentCore Runtime** ← mountain: Deployed & wired up ✅ Mountain 1 reached
+  - `scripts/deploy.sh` (idempotent, source of truth): build arm64 → push to ECR
+    → ensure IAM execution role (`scripts/aws/*.json`) → create AgentCore runtime
+    (`networkMode=PUBLIC`, `serverProtocol=HTTP`) → wait READY.
+  - `scripts/cloud-smoke.sh` (Layer 5): `invoke-agent-runtime` end-to-end.
+  - Live in **us-west-2**: runtime `trainer_agent-VyiY9TFdtC`. Cloud smoke PASS —
+    `{"message":"..."}` → `{"reply":"hi"}`. All resources in `notes/infrastructure.md`.
+  - **Gotcha:** the shell's `AWS_DEFAULT_REGION=us-east-1` overrode the profile's
+    us-west-2 on the first run, creating resources in the wrong region and failing
+    role validation (trust `SourceArn` pinned to us-west-2). Fix: scripts pin
+    `export AWS_REGION=us-west-2` rather than inheriting it.

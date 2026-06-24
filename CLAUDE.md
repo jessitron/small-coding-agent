@@ -26,6 +26,13 @@ Test at the lowest layer that reproduces a bug. Named, executable scripts:
 - `scripts/smoke-container.sh` — Layer 3: build the arm64 image, run it, assert.
 The image must be `linux/arm64` (AgentCore's arch); always pass `--platform linux/arm64`.
 
+## Deploying (AWS)
+`scripts/deploy.sh` builds+pushes to ECR and creates/updates the AgentCore
+runtime (idempotent); `scripts/cloud-smoke.sh` invokes the deployed runtime.
+**Region is pinned to us-west-2 in the scripts** — do NOT inherit the shell's
+`AWS_DEFAULT_REGION` (this machine is us-east-1). All AWS resources are recorded
+in `notes/infrastructure.md`.
+
 ## Conventions
 - Stack: Python + Strands Agents + `bedrock-agentcore`. Observability is
   first-class: standard OTel to Honeycomb, raw LLM I/O captured on spans.
