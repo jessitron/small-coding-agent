@@ -21,7 +21,13 @@ flowchart TD
     Backend -->|HTTPS, bearer token| Lambda
     Lambda -->|InvokeAgentRuntime, runtimeSessionId| Agent
     Agent -->|git push + gh pr create| GitHub
+
+    classDef inRepo fill:#cdeccd,stroke:#2e7d32,stroke-width:2px,color:#000;
+    class Lambda,Agent inRepo;
 ```
+
+> 🟩 Green nodes (**Lambda** and **Trainer Agent**) are what lives in this repo.
+> The rest are external systems we talk to.
 
 | Hop | How |
 | --- | --- |
