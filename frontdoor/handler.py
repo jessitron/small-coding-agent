@@ -45,6 +45,13 @@ REGION = os.environ["AWS_REGION"]
 AGENT_RUNTIME_ARN = os.environ["AGENT_RUNTIME_ARN"]
 BEARER_SECRET_ID = os.environ["BEARER_SECRET_ID"]
 
+# Version of the app-facing interface (request/response contract + headers).
+# MUST stay in sync with notes/frontdoor-integration.md, which is the spec the
+# mtg-deck-shuffler app integrates against. Bump the MAJOR on a breaking change,
+# the MINOR on a backward-compatible addition. Advertised on every response via
+# the X-Trainer-Agent-Interface-Version header and stamped on the span.
+INTERFACE_VERSION = "1.0"
+
 # Lambda price *rate* (arm64, us-west-2 list price). Hard-coded here; the dollar
 # cost per invoke is derived in Honeycomb as rate x duration, so we can re-price
 # without redeploying. See notes/decisions.md.
@@ -104,7 +111,10 @@ def _header(headers, name):
 def _resp(status, body):
     return {
         "statusCode": status,
-        "headers": {"Content-Type": "application/json"},
+        "headers": {
+            "Content-Type": "application/json",
+            "X-Trainer-Agent-Interface-Version": INTERFACE_VERSION,
+        },
         "body": json.dumps(body),
     }
 
@@ -135,6 +145,7 @@ def lambda_handler(event, context):
         "frontdoor.invoke", context=parent_ctx, kind=SpanKind.SERVER
     ) as span:
         span.set_attribute("session.id", session_id)
+        span.set_attribute("frontdoor.interface_version", INTERFACE_VERSION)
         # Lambda cost rate (dollars derived downstream as rate x duration).
         span.set_attribute("lambda.cost.rate_gb_second", RATE_GB_SECOND)
         span.set_attribute("lambda.cost.rate_per_request", RATE_PER_REQUEST)
