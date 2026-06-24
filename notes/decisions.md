@@ -5,7 +5,7 @@ Running log of choices made with Jessitron, newest at the bottom.
 ## 2026-06-23 — initial design interview
 
 - **Runtime**: Amazon Bedrock AgentCore Runtime.
-- **Transport**: the *other* app owns the websocket + chat UI and invokes
+- **Transport**: the _other_ app owns the websocket + chat UI and invokes
   AgentCore once per message (request/response; streaming not required —
   "not picky").
 - **Stack**: Python + Strands Agents.

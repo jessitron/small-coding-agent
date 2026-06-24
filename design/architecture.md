@@ -1,7 +1,7 @@
 # small-coding-agent — architecture
 
 A single-purpose coding agent that runs on **Amazon Bedrock AgentCore Runtime**.
-It chats with a human (over a websocket owned by *another* app), figures out a
+It chats with a human (over a websocket owned by _another_ app), figures out a
 coding task, implements it on a branch of **one** repo
 (`jessitron/mtg-deck-shuffler`), opens a PR, and sends the PR link back over chat.
 
@@ -19,6 +19,7 @@ chat UI ──ws──> other app ──InvokeAgentRuntime(runtimeSessionId, {me
 - Our agent is request/response (no streaming required). AgentCore keeps the
   session's microVM warm and gives it session affinity, so disk + memory persist
   across invokes within a session.
+- Sessions are expected to be short-lived. It is acceptable to fail if AgentCore's VM times out between chat messages, although let's make it clear to the user and telemetry when that happens.
 
 ## The agent
 
@@ -32,20 +33,29 @@ chat UI ──ws──> other app ──InvokeAgentRuntime(runtimeSessionId, {me
 ### Invoke contract (agent ⇄ other app)
 
 Request payload (from the other app):
+
 ```json
 { "message": "user's chat message" }
 ```
+
 `runtimeSessionId` is carried by AgentCore, not in the body.
 
 Response:
+
 ```json
-{ "reply": "text to show in chat", "status": "chatting|coding|asking|done|error", "pr_url": "https://github.com/.../pull/123" }
+{
+  "reply": "text to show in chat",
+  "status": "chatting|coding|asking|done|error",
+  "pr_url": "https://github.com/.../pull/123"
+}
 ```
+
 `pr_url` is present only once the PR exists.
 
 ### State
 
 State is keyed by `session_id` and lives **server-side**:
+
 - **Conversation**: a Strands session/conversation store persisted to the
   session's workspace dir (so the other app need not resend history).
 - **Working tree**: the repo is `git clone`d once per session into a workspace
@@ -87,6 +97,6 @@ framework (Strands) emitting standard OTel to Honeycomb.
 
 ## Open questions / not yet decided
 
-- Exact deploy mechanism (starter toolkit CodeBuild vs. own Dockerfile).
-- Whether to adopt AgentCore Memory now or after v1.
-- How the other app authenticates to InvokeAgentRuntime (IAM).
+- Exact deploy mechanism (starter toolkit CodeBuild vs. own Dockerfile). JESS: I like Dockerfiles
+- Whether to adopt AgentCore Memory now or after v1. JESS: after v1
+- How the other app authenticates to InvokeAgentRuntime (IAM). JESS: an open web endpoint plus a bearer auth token that's validated. I'm connecting 1 app to this one, so I can give that app the same secret
