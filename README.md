@@ -17,7 +17,7 @@ flowchart TD
     Agent["Trainer Agent — AgentCore Runtime<br/><i>Strands agent: gathers requirements,<br/>codes on a branch, opens the PR</i>"]
     GitHub["GitHub<br/><i>jessitron/mtg-deck-shuffler → PR</i>"]
 
-    UI -->|websocket| Backend
+    UI -->|HTTP request/response| Backend
     Backend -->|HTTPS, bearer token| Lambda
     Lambda -->|InvokeAgentRuntime, runtimeSessionId| Agent
     Agent -->|git push + gh pr create| GitHub
@@ -31,7 +31,7 @@ flowchart TD
 
 | Hop | How |
 | --- | --- |
-| UI → backend | Websocket; the backend owns the chat UI and the conversation history. |
+| UI → backend | HTTP request/response; the backend owns the chat UI and the conversation history. |
 | backend → Lambda | HTTPS to an endpoint fulfilled by a Lambda, authenticated with a bearer token. |
 | Lambda → Trainer Agent | `InvokeAgentRuntime`, once per user message, carrying a stable `runtimeSessionId`. |
 | Trainer Agent → GitHub | Implements on a branch, then `git push` + `gh pr create`; the PR link flows back up the chain. |
