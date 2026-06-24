@@ -13,9 +13,9 @@ chat UI ──http──> other app ──InvokeAgentRuntime(runtimeSessionId, {
                      └──────────── {reply, status, pr_url?} ◀──────────────────────┘
 ```
 
-- The **other app** owns the chat UI and the conversation history. It calls
-  AgentCore's invoke endpoint **once per user message** (synchronous HTTP
-  request/response), passing a stable `runtimeSessionId`.
+- The **other app** owns the chat UI. It calls AgentCore's invoke endpoint
+  **once per user message** (synchronous HTTP request/response), passing a stable
+  `runtimeSessionId`.
 - The whole path — backend → Lambda → agent — is synchronous and joins **one
   trace** that starts in the other app's backend (see Observability). No
   streaming required. AgentCore keeps the session's microVM warm and gives it

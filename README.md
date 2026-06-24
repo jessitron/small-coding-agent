@@ -13,7 +13,7 @@ the invoke contract.
 flowchart TD
     UI["MTG Deck Shuffler UI<br/><i>chat in the browser</i>"]
     subgraph trace["one synchronous trace — starts here"]
-        Backend["MTG Deck Shuffler backend<br/><i>owns the chat + conversation history</i>"]
+        Backend["MTG Deck Shuffler backend<br/><i>owns the chat UI</i>"]
         Lambda["Lambda<br/><i>fulfills the HTTP endpoint</i>"]
         Agent["Trainer Agent — AgentCore Runtime<br/><i>Strands agent: gathers requirements,<br/>codes on a branch, opens the PR</i>"]
     end
@@ -36,7 +36,7 @@ flowchart TD
 
 | Hop | How |
 | --- | --- |
-| UI → backend | HTTP request/response; the backend owns the chat UI and the conversation history. |
+| UI → backend | HTTP request/response; the backend owns the chat UI. |
 | backend → Lambda | HTTPS to an endpoint fulfilled by a Lambda, authenticated with a bearer token. |
 | Lambda → Trainer Agent | `InvokeAgentRuntime`, once per user message, carrying a stable `runtimeSessionId`. |
 | Trainer Agent → GitHub | Implements on a branch, then `git push` + `gh pr create`; the PR link flows back up the chain. |

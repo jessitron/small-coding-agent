@@ -24,10 +24,6 @@ Running log of choices made with Jessitron, newest at the bottom.
 
 - **No websockets anywhere**: the entire path (backend → Lambda → agent) is
   synchronous HTTP request/response.
-- **Conversation history lives in the MTG Deck Shuffler backend**, not in an
-  agent-side store. Supersedes the earlier "conversation state in the session
-  workspace dir" plan; the client resends history each invoke, so the agent
-  doesn't need to persist it across a cold VM.
 - **One trace, rooted in the backend**: the trace starts in the other app's
   backend and the agent's spans join it via propagated trace context (backend →
   Lambda → AgentCore) — the agent is *not* the trace root.
