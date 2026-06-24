@@ -1,0 +1,10 @@
+# Local test stub for the Trainer Agent front door.
+# Zero pip dependencies — stdlib only — so the image is tiny and fast.
+# Build context is the frontdoor/ directory:
+#   docker build -f frontdoor/Dockerfile.stub -t trainer-agent-frontdoor-stub frontdoor
+FROM python:3.13-slim
+WORKDIR /app
+COPY contract.py stub.py ./
+ENV PORT=8080
+EXPOSE 8080
+CMD ["python3", "stub.py"]

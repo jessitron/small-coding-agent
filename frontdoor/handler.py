@@ -26,7 +26,6 @@ Telemetry-from-Lambda gotchas this handles (see notes/telemetry.md):
   are independent; a dead collector can't fail a chat turn.
 """
 
-import hmac
 import json
 import os
 
@@ -39,18 +38,13 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.trace import SpanKind
 
+import contract  # shared request validation (same rules the test stub enforces)
+
 # --- module scope: built once per cold start, reused while warm ---------------
 
 REGION = os.environ["AWS_REGION"]
 AGENT_RUNTIME_ARN = os.environ["AGENT_RUNTIME_ARN"]
 BEARER_SECRET_ID = os.environ["BEARER_SECRET_ID"]
-
-# Version of the app-facing interface (request/response contract + headers).
-# MUST stay in sync with notes/frontdoor-integration.md, which is the spec the
-# mtg-deck-shuffler app integrates against. Bump the MAJOR on a breaking change,
-# the MINOR on a backward-compatible addition. Advertised on every response via
-# the X-Trainer-Agent-Interface-Version header and stamped on the span.
-INTERFACE_VERSION = "1.0"
 
 # Lambda price *rate* (arm64, us-west-2 list price). Hard-coded here; the dollar
 # cost per invoke is derived in Honeycomb as rate x duration, so we can re-price
@@ -99,21 +93,12 @@ def _bearer_secret():
     return _expected_bearer
 
 
-def _header(headers, name):
-    """Case-insensitive header lookup (Function URL lowercases, but be safe)."""
-    name = name.lower()
-    for k, v in headers.items():
-        if k.lower() == name:
-            return v
-    return None
-
-
 def _resp(status, body):
     return {
         "statusCode": status,
         "headers": {
             "Content-Type": "application/json",
-            "X-Trainer-Agent-Interface-Version": INTERFACE_VERSION,
+            contract.INTERFACE_VERSION_HEADER: contract.INTERFACE_VERSION,
         },
         "body": json.dumps(body),
     }
@@ -122,22 +107,13 @@ def _resp(status, body):
 def lambda_handler(event, context):
     headers = event.get("headers") or {}
 
-    # 1. Authenticate. Constant-time compare to avoid leaking the secret via timing.
-    auth = _header(headers, "authorization") or ""
-    presented = auth[7:] if auth.lower().startswith("bearer ") else ""
-    if not presented or not hmac.compare_digest(presented, _bearer_secret()):
-        return _resp(401, {"error": "unauthorized"})
-
-    # 2. Parse the request body: {"message": "...", "session_id": ">=33 chars"}.
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except json.JSONDecodeError:
-        return _resp(400, {"error": "invalid JSON body"})
-    message = body.get("message", "")
-    session_id = body.get("session_id")
-    # AgentCore requires runtimeSessionId >= 33 chars.
-    if not session_id or len(session_id) < 33:
-        return _resp(400, {"error": "session_id required (>= 33 chars)"})
+    # 1 + 2. Authenticate + validate the body, using the SHARED contract (the same
+    # rules the local test stub enforces — see frontdoor/contract.py).
+    result = contract.validate_request(headers, event.get("body"), _bearer_secret())
+    if result[0] == "error":
+        _, status, body = result
+        return _resp(status, body)
+    _, message, session_id = result
 
     # 3. Continue the caller's trace and proxy the call.
     parent_ctx = extract({k.lower(): v for k, v in headers.items()})
@@ -149,10 +125,10 @@ def lambda_handler(event, context):
         # (via the same header on the request). A mismatch is a WARNING, surfaced
         # in telemetry — never an error; we don't reject on it. Compare the two in
         # Honeycomb to spot drift.
-        span.set_attribute("frontdoor.interface_version", INTERFACE_VERSION)
+        span.set_attribute("frontdoor.interface_version", contract.INTERFACE_VERSION)
         span.set_attribute(
             "frontdoor.client_interface_version",
-            _header(headers, "x-trainer-agent-interface-version") or "unset",
+            contract.header_lookup(headers, contract.INTERFACE_VERSION_HEADER) or "unset",
         )
         # Lambda cost rate (dollars derived downstream as rate x duration).
         span.set_attribute("lambda.cost.rate_gb_second", RATE_GB_SECOND)

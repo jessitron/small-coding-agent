@@ -100,7 +100,7 @@ uv pip install --quiet --target "$BUILD_DIR" \
   --python-version 3.13 \
   --only-binary :all: \
   -r frontdoor/requirements.txt
-cp frontdoor/handler.py "$BUILD_DIR/"
+cp frontdoor/handler.py frontdoor/contract.py "$BUILD_DIR/"
 ( cd "$BUILD_DIR" && zip -qr "$ZIP" . )
 echo "== zip: $ZIP ($(du -h "$ZIP" | cut -f1))"
 
