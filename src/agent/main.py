@@ -25,6 +25,7 @@ health check at ``GET /ping``.
 from bedrock_agentcore import BedrockAgentCoreApp
 from dotenv import load_dotenv
 from opentelemetry import trace
+from opentelemetry.propagate import extract
 
 from agent.observability import configure_tracing, flush
 
@@ -50,11 +51,24 @@ def invoke(payload, context=None):
     ``runtimeSessionId`` is carried by AgentCore (on ``context``), not in the body.
     Each turn is one ``agent.invocation`` span; spans are flushed before returning
     so they leave the microVM before AgentCore may freeze it.
+
+    The trace does **not** start here: the caller (the front-door Lambda, and
+    behind it the app) propagates W3C trace context via the ``InvokeAgentRuntime``
+    ``traceParent``/``traceState``/``baggage`` params. AgentCore forwards those as
+    request headers (see ``context.request_headers``), and we extract them so
+    ``agent.invocation`` joins the caller's trace instead of rooting its own. If
+    no context is forwarded (e.g. a bare ``cloud-smoke`` invoke), we root a span.
     """
     message = payload.get("message", "")
     session_id = getattr(context, "session_id", None)
 
-    with _tracer.start_as_current_span("agent.invocation") as span:
+    # Extract propagated trace context from the forwarded request headers. Keys
+    # may arrive in any case (HTTP/2 lowercases; HTTP/1.1 may not), so normalize.
+    headers = getattr(context, "request_headers", None) or {}
+    carrier = {k.lower(): v for k, v in headers.items()}
+    parent_ctx = extract(carrier)
+
+    with _tracer.start_as_current_span("agent.invocation", context=parent_ctx) as span:
         if session_id:
             span.set_attribute("session.id", session_id)
         span.set_attribute("agent.message", message)
