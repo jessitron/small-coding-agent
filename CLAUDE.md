@@ -20,6 +20,12 @@ and log proactively; use `drop-buoy` to capture work without derailing. Open wor
 `uv run agent` starts the AgentCore server on :8080. Invoke with
 `curl -XPOST localhost:8080/invocations -d '{"message":"hi"}'`; health at `/ping`.
 
+## Local testing (push bugs down — see `notes/local-testing-advice.md`)
+Test at the lowest layer that reproduces a bug. Named, executable scripts:
+- `scripts/smoke-local.sh` — Layer 2: in-process, assert `/ping` + `/invocations`.
+- `scripts/smoke-container.sh` — Layer 3: build the arm64 image, run it, assert.
+The image must be `linux/arm64` (AgentCore's arch); always pass `--platform linux/arm64`.
+
 ## Conventions
 - Stack: Python + Strands Agents + `bedrock-agentcore`. Observability is
   first-class: standard OTel to Honeycomb, raw LLM I/O captured on spans.
