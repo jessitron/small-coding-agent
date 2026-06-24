@@ -71,3 +71,21 @@ Running log of choices made with Jessitron, newest at the bottom.
   blocking public Function URLs. It wasn't — it was the missing second permission
   statement (Oct-2025 dual-permission requirement). Jessitron caught it via the
   Honeycomb collector-on-Lambda blog. Lesson: verify before concluding "blocked."
+
+## 2026-06-24 — the interface is versioned, and so is its doc
+
+- **The app-facing contract carries a `MAJOR.MINOR` version** (`1.0`), defined in
+  `frontdoor/handler.py` (`INTERFACE_VERSION`) and advertised at runtime via the
+  `X-Trainer-Agent-Interface-Version` response header. The spec —
+  `notes/frontdoor-integration.md` — is part of the interface and is versioned
+  with it (banner + changelog); the doc and the service bump together.
+- **Consumers pin by copying the doc.** mtg-deck-shuffler copies
+  `frontdoor-integration.md` into its own repo, which records the version it
+  integrates against. So the spec travels with the consumer, and the version it
+  built against is visible in *its* git history.
+- **Mismatch is a warning, not an error.** The client declares its version on the
+  request (same header); the front door records both `frontdoor.interface_version`
+  and `frontdoor.client_interface_version` on its span and never rejects on
+  mismatch. Drift is detected in Honeycomb
+  (`frontdoor.client_interface_version != frontdoor.interface_version`), not at
+  runtime. (Jessitron's call — keep the boundary forgiving, make drift observable.)
