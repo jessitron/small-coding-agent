@@ -1,0 +1,6 @@
+# Front-door Lambda deps, bundled into the zip (see scripts/deploy-frontdoor.sh).
+# boto3 is pinned (not relying on Lambda's bundled copy) because the data-plane
+# bedrock-agentcore client is recent and may be missing/old in the runtime.
+boto3>=1.43
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http

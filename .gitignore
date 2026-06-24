@@ -13,3 +13,7 @@ venv/
 
 # agent workspace (cloned repos, working trees)
 workspace/
+
+# front-door Lambda build artifacts (rebuilt by scripts/deploy-frontdoor.sh)
+frontdoor/build/
+frontdoor/frontdoor.zip
