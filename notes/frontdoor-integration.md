@@ -201,6 +201,49 @@ async function askTrainer(message: string, sessionId: string) {
 3. While `status` is `chatting`/`asking`/`coding`, keep letting the user reply.
 4. When `pr_url` appears, surface the PR link. `status: done` ends the task.
 
+## Local testing — the stub
+
+For local and CI testing you don't want the real agent (its latency, AWS, or a PR
+on every run). Run the **front-door stub**: a faithful stand-in that enforces the
+*same* request contract as production (it shares the validation code, so it can't
+drift) but returns **canned** replies. Point your integration tests at it.
+
+### Get + run it
+
+The stub is a Docker image in private ECR. With AWS access to the account (the
+same access you used to fetch the token above):
+
+```bash
+aws ecr get-login-password --profile sandbox --region us-west-2 \
+  | docker login --username AWS --password-stdin 414852377253.dkr.ecr.us-west-2.amazonaws.com
+
+docker run -p 8080:8080 -e STUB_BEARER=test-token \
+  414852377253.dkr.ecr.us-west-2.amazonaws.com/trainer-agent-frontdoor-stub:latest
+```
+
+Now hit `http://localhost:8080/` exactly as you would the real endpoint, using
+`test-token` as the bearer. Health check: `GET /ping`. (The image is built from the
+trainer-agent repo's `frontdoor/`; `latest` tracks the current interface version.)
+
+### What it enforces (real) vs. fakes
+
+- **Enforces — same rules as prod**: bearer auth → `401`; non-JSON body → `400`;
+  `session_id` < 33 chars → `400`; and it sets the
+  `X-Trainer-Agent-Interface-Version` response header. So your auth, request shape,
+  and version handling get genuinely tested.
+- **Fakes — the reply**: no real agent, no AWS, no PR. The `status` is driven by the
+  message text so you can exercise each branch of your UI:
+
+  | message contains | canned response |
+  | --- | --- |
+  | `open the pr` / `pr please` | `{ "status": "done", "pr_url": "…/pull/0" }` |
+  | `ask` | `{ "status": "asking" }` |
+  | `error` / `fail` | `{ "status": "error" }` |
+  | anything else | `{ "status": "chatting" }` |
+
+- **Bearer**: set `STUB_BEARER` to whatever your tests use (default `stub-token`).
+  This is a test token — **not** the real production secret.
+
 ## Changelog
 
 - **1.0** (2026-06-24) — initial interface. `POST` with `{message, session_id}` +

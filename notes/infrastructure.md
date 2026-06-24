@@ -107,6 +107,20 @@ aws iam delete-role --role-name trainer-agent-frontdoor-lambda
 aws secretsmanager delete-secret --secret-id trainer-agent/frontdoor-bearer --region us-west-2 --force-delete-without-recovery
 ```
 
+### Front-door test stub (private ECR)
+
+A validating stand-in for the front door, for mtg-deck-shuffler's local/CI testing.
+Published by **`scripts/publish-stub.sh`**; built from `frontdoor/Dockerfile.stub`
+(stdlib-only `frontdoor/stub.py` + the shared `frontdoor/contract.py`). Enforces the
+same request contract as prod, returns canned replies. Usage doc:
+`notes/frontdoor-integration.md` §"Local testing — the stub".
+
+| Resource | Type | Name / URI | Notes |
+|----------|------|------------|-------|
+| Stub image | ECR (**private**) | `414852377253.dkr.ecr.us-west-2.amazonaws.com/trainer-agent-frontdoor-stub` | multi-arch (amd64+arm64), tagged by git sha + `latest`; pull needs AWS access to this account; `docker run -p 8080:8080 -e STUB_BEARER=… <uri>:latest` |
+
+Teardown: `aws ecr delete-repository --repository-name trainer-agent-frontdoor-stub --region us-west-2 --force`
+
 ## Still planned (from TODO.md, mountain: "Deployed & wired up")
 
 - **Secrets Manager secret** holding the fine-grained GitHub PAT (fetched at
