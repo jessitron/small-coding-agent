@@ -55,6 +55,7 @@ traces that show the loop doing its job.
   single-purpose by design.
 - **Observability is first-class**: standard OTel to Honeycomb, raw LLM I/O on
   spans. Continue traces with propagated context.
+- **Infrastructure is documented**: it's OK to wire things up with the AWS CLI as long as **every command run is documented in notes/infrastructure.md** so that we can delete it and do it again later.
 
 ## Non-goals
 
