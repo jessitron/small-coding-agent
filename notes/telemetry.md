@@ -75,7 +75,10 @@ Until verified, the flush guarantees delivery at a latency cost.
 - **Prod**: ✅ deployed (runtime revision 2 carries the OTEL_* env). A cloud-smoke
   invoke produced a span that the **Boswell Lambda received, transformed, and
   exported with no errors** (confirmed in `/aws/lambda/boswell` CloudWatch logs).
-- **Remaining**: eyes-on-trace in the Honeycomb UI (team `modernity`: env `local`
-  and env `cynditaylor-com-bot`, `WHERE service.name = "trainer-agent"`). Can't be
-  done from this session (no `modernity` MCP) — a manual look. The egress was
-  clean on both paths, so this is a confirmation, not a debug.
+- **Confirmed in Honeycomb** ✅ (via the `honeycomb-modernity` MCP, once `.mcp.json`
+  loaded): the `agent.invocation` span is queryable in **both** envs (`local` and
+  `cynditaylor-com-bot`) with `service.name=trainer-agent`, `agent.status=chatting`,
+  and `collector.boswell=washere` (proves the Boswell path). **Safe Harbor reached.**
+  - To verify from a Claude session, the project `.mcp.json` (`honeycomb-modernity`
+    → `https://mcp.honeycomb.io/mcp`) must be loaded — it's a project MCP, so it
+    needs session start / approval, not a mid-session add.
