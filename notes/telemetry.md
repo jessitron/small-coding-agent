@@ -67,14 +67,15 @@ warm-VM batching actually delivers our end-of-session spans** (grab a real trace
 and, if so, drop the per-invoke flush to protect the "responsive chat" goal.
 Until verified, the flush guarantees delivery at a latency cost.
 
-## Status (2026-06-24)
+## Status (2026-06-24, after the ingest incident recovered)
 
-- **Local**: wired + the `agent.invocation` span reaches the Boswell collector
-  (flush round-trip confirmed; no producer errors). **Not yet confirmed visible
-  in Honeycomb** — there's a Honeycomb **ingest** incident (queries work, but
-  newly-sent spans are delayed/dropped, so a span sent now may never appear), and
-  no `modernity` MCP is wired into this session. Re-send + verify once ingest
-  recovers.
-- **Prod**: wiring ready in `deploy.sh` but **not deployed**. Holding the prod
-  deploy + verification until the incident clears (avoid per-invoke flush hanging
-  prod turns while Boswell can't reach Honeycomb).
+- **Local**: ✅ wired + verified to the collector. After recovery, the invoke
+  flush dropped from ~3.3s (retrying during the incident) to **0.2s** with clean
+  egress logs — i.e. Honeycomb now accepts the export.
+- **Prod**: ✅ deployed (runtime revision 2 carries the OTEL_* env). A cloud-smoke
+  invoke produced a span that the **Boswell Lambda received, transformed, and
+  exported with no errors** (confirmed in `/aws/lambda/boswell` CloudWatch logs).
+- **Remaining**: eyes-on-trace in the Honeycomb UI (team `modernity`: env `local`
+  and env `cynditaylor-com-bot`, `WHERE service.name = "trainer-agent"`). Can't be
+  done from this session (no `modernity` MCP) — a manual look. The egress was
+  clean on both paths, so this is a confirmation, not a debug.

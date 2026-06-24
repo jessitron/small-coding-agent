@@ -8,8 +8,8 @@ A trailing `←` comment carries `mountain:`, `priority:`, `tag:`, `standing`.
 
 ## Next
 
-- [ ] Deploy prod telemetry through Boswell + verify a trace in Honeycomb (team `modernity`, env `cynditaylor-com-bot`, `service.name=trainer-agent`) once the Honeycomb ingest incident clears ← Safe Harbor; priority: high
-  - Wiring is ready in `scripts/deploy.sh` (sets OTEL_* env on the runtime, fetches the Boswell token). Held during the 2026-06-24 ingest incident because per-invoke `flush()` would hang prod turns while Boswell can't reach Honeycomb. Also re-confirm the local trace lands. See `notes/telemetry.md`.
+- [ ] Eyeball a trace in the Honeycomb UI (team `modernity`: env `local` and env `cynditaylor-com-bot`, `WHERE service.name = "trainer-agent"`) ← Safe Harbor; priority: high
+  - Prod telemetry is deployed and Boswell exported our span with no errors (local + prod pipes both proven). This is the final visual confirmation — can't be done in-session (no `modernity` MCP). See `notes/telemetry.md`.
 - [ ] Verify warm-VM batching delivers end-of-session spans without per-invoke flush; if so, drop the flush to protect chat latency ← Safe Harbor; priority: medium
 - [ ] Add an authed web endpoint — open endpoint + bearer-token validation (shared secret with my app) ← mountain: Deployed & wired up; priority: medium
 - [ ] Wire my app to invoke the agent (InvokeAgentRuntime with a stable runtimeSessionId) and show the reply ← mountain: Deployed & wired up; priority: medium

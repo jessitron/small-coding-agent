@@ -48,3 +48,10 @@ Completed landings, newest at the bottom. (In-repo tracking; see `SEAMAP.md` §T
     token fetched at deploy time). Held until the Honeycomb ingest incident clears.
   - **Not yet confirmed in Honeycomb** (team `modernity`, env `local`): ingest
     incident + no `modernity` MCP in-session. See `notes/telemetry.md`.
+
+- **Telemetry — prod deployed + egress confirmed** ← Safe Harbor (after incident recovered)
+  - Local: flush dropped 3.3s→0.2s post-recovery, clean egress → Honeycomb accepts it.
+  - Prod: deployed runtime rev 2 with OTEL_* env; cloud-smoke span was received,
+    transformed, and exported by the Boswell Lambda with no errors (CloudWatch).
+  - Both pipes proven end-to-end. Only the eyes-on-trace in the Honeycomb UI
+    (team `modernity`) remains — a manual look, no `modernity` MCP in-session.
