@@ -43,3 +43,31 @@ Running log of choices made with Jessitron, newest at the bottom.
   over standing up a separate collector/env. ("ohwell")
 - **Deferred**: extracting Boswell into a shared component — captured as a
   follow-up, not done now. See `notes/telemetry.md` for the full wiring.
+
+## 2026-06-24 — front door: Lambda + public bearer Function URL
+
+- **A Lambda fronts the runtime** so the app uses a plain `Authorization: Bearer`
+  over a public HTTPS URL instead of signing SigV4. Rejected AgentCore's native
+  `--authorizer-configuration` (it wants OIDC/JWT, not the static shared secret
+  Jessitron wanted for one app). Rejected API Gateway (29s timeout would kill long
+  coding turns). Chose a **Lambda Function URL** (up to the 15-min Lambda timeout).
+- **Accepted the blocking-proxy cost.** A synchronous Lambda bills while it waits
+  on the agent. Jessitron flagged this as smelly; we measured it at **<1¢ per
+  coding invoke** (arm64, 128MB) and postponed the async-callback alternative
+  (buoyed in TODO.md). Min memory + arm64 to keep it cheap.
+- **Lambda cost as observability, not code.** The handler stamps the hard-coded
+  price *rate* (`lambda.cost.rate_gb_second`, `lambda.cost.rate_per_request`,
+  `lambda.memory_gb`) on its span; the dollar cost is a **calculated field in
+  Honeycomb** (`rate × duration`). Lets us re-price without redeploying, and keeps
+  arithmetic out of the hot path. (Jessitron's call.)
+- **Lambda telemetry uses `SimpleSpanProcessor`, not Batch.** Lambda freezes the
+  env on return, suspending any background export thread; synchronous export has
+  no thread to freeze. (The agent keeps Batch+flush — it emits many spans/turn.)
+- **Trace context to the agent rides in the payload, not headers** — forced by the
+  discovery that AgentCore forwards only `baggage`, not the `traceParent` param
+  (see infrastructure.md gotcha). Open follow-up: is there a standard mechanism?
+  (TODO.md, for Jess's OTel knowledge.)
+- **What turned out NOT to be true**: an early 403 looked like an org guardrail
+  blocking public Function URLs. It wasn't — it was the missing second permission
+  statement (Oct-2025 dual-permission requirement). Jessitron caught it via the
+  Honeycomb collector-on-Lambda blog. Lesson: verify before concluding "blocked."

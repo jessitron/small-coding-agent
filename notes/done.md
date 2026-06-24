@@ -55,3 +55,29 @@ Completed landings, newest at the bottom. (In-repo tracking; see `SEAMAP.md` §T
     transformed, and exported by the Boswell Lambda with no errors (CloudWatch).
   - Both pipes proven end-to-end. Only the eyes-on-trace in the Honeycomb UI
     (team `modernity`) remains — a manual look, no `modernity` MCP in-session.
+
+- **Eyeball a trace in Honeycomb** ← Safe Harbor ✅ Safe Harbor reached
+  - Confirmed via the `honeycomb-modernity` MCP: `agent.invocation` span in both
+    envs (`local` + `cynditaylor-com-bot`), `service.name=trainer-agent`,
+    `agent.status=chatting`, `collector.boswell=washere` (proves the Boswell path).
+
+- **Authed web front door — Lambda + public bearer Function URL** ← mountain: Deployed & wired up
+  - `frontdoor/handler.py`: thin arm64/128MB Lambda behind a **public Function URL**.
+    Validates a shared **bearer** (Secrets Manager, constant-time compare), then
+    proxies to `InvokeAgentRuntime` via SigV4, returning the agent's reply. Telemetry
+    via `SimpleSpanProcessor` (freeze-proof, no background thread); stamps the
+    hard-coded Lambda cost *rate* on `frontdoor.invoke` (dollars derived in Honeycomb
+    as rate × duration). `service.name=trainer-agent-frontdoor`.
+  - `scripts/deploy-frontdoor.sh` (idempotent infra record): secret → IAM role →
+    arm64 zip → Lambda → Function URL. `scripts/frontdoor-smoke.sh` (bearer happy
+    path + 401 negative). All resources in `notes/infrastructure.md`.
+  - **End-to-end trace propagation proven**: `scripts/propagation-test.sh` (a test
+    client that starts a root span and calls the front door with `traceparent`
+    injected) produced **one trace spanning three services** in Honeycomb —
+    `trainer-agent-test-client → trainer-agent-frontdoor → trainer-agent`
+    (trace `c6eb1ec7…`).
+  - **Two gotchas, both fixed (see infrastructure.md):** (1) a public `AuthType=NONE`
+    Function URL needs a *second* permission (`lambda:InvokeFunction` via
+    `--invoked-via-function-url`) or it 403s silently with no logs; (2) AgentCore
+    forwards only the `baggage` header to the container — NOT the `traceParent`
+    param — so trace context to the agent rides in the **payload**, not headers.

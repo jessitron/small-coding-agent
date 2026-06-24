@@ -55,14 +55,64 @@ aws iam delete-role --role-name trainer-agent-agentcore-runtime
 aws ecr delete-repository --repository-name trainer-agent --region us-west-2 --force
 ```
 
+## Front door — authed Lambda + public Function URL
+
+Created 2026-06-24 in **us-west-2**, account `414852377253`, profile `sandbox`,
+by **`scripts/deploy-frontdoor.sh`** (idempotent; the source of truth). The app
+POSTs JSON with a shared **bearer** to a public Function URL; the Lambda validates
+it and proxies to `InvokeAgentRuntime` via SigV4. Smoke: `scripts/frontdoor-smoke.sh`.
+
+| Resource | Type | Name / ARN | Notes |
+|----------|------|------------|-------|
+| Bearer secret | Secrets Manager | `trainer-agent/frontdoor-bearer` (`…-CCVd4Y`) | shared token the app presents; random `openssl rand -hex 32`; read at runtime by the Lambda |
+| Lambda role | IAM (global) | `arn:aws:iam::414852377253:role/trainer-agent-frontdoor-lambda` | `AWSLambdaBasicExecutionRole` (logs) + inline `trainer-agent-frontdoor-permissions` (`InvokeAgentRuntime` on the runtime, `GetSecretValue` on the bearer) |
+| Front-door Lambda | Lambda | `trainer-agent-frontdoor` | python3.13 / **arm64 / 128MB** / timeout 300s; zip-packaged (`frontdoor/`); `service.name=trainer-agent-frontdoor` |
+| Function URL | Lambda Function URL | `https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/` | `AuthType=NONE` (public); the Lambda validates the bearer in code |
+
+### ⚠️ Gotcha — a public Function URL needs TWO permission statements
+
+As of Oct 2025, `lambda:InvokeFunctionUrl` alone is **not** enough for an
+`AuthType=NONE` URL — you also need `lambda:InvokeFunction` granted via
+`--invoked-via-function-url`. Without the second statement the URL gate returns a
+silent **403 `AccessDeniedException`** and the Lambda never runs (no CloudWatch
+logs to debug from). `deploy-frontdoor.sh` adds both. Ref:
+<https://www.honeycomb.io/blog/running-opentelemetry-collector-lambda>
+
+### ⚠️ Gotcha — AgentCore forwards only `baggage`, not the trace params
+
+`InvokeAgentRuntime` takes `traceParent`/`traceState`/`baggage` params, but
+AgentCore forwards **only `baggage`** to the container as a request header
+(`context.request_headers`) — it consumes `traceParent`/`traceState` for its own
+internal trace linkage. So W3C trace context for *our* agent span rides in the
+invoke **payload** (`traceparent`/`tracestate`), and the agent extracts it there.
+Proven end-to-end: one trace spans test-client → frontdoor → agent.
+
+### ⚠️ Gotcha — `deploy.sh` tags by HEAD sha; warm VMs serve the old image
+
+Two deploy traps we hit: (1) `deploy.sh` tags the image with
+`git rev-parse --short HEAD`, so **uncommitted** changes reuse the same tag and
+may not redeploy cleanly — commit before deploying. (2) AgentCore keeps a
+**warm microVM per session**; reusing a `runtimeSessionId` after a redeploy can
+hit the *old* image. Use a fresh `session_id` to force the new version (the
+smoke/propagation scripts accept `SESSION_ID`).
+
+### Front-door teardown
+
+```
+aws lambda delete-function-url-config --function-name trainer-agent-frontdoor --region us-west-2
+aws lambda delete-function --function-name trainer-agent-frontdoor --region us-west-2
+aws iam detach-role-policy --role-name trainer-agent-frontdoor-lambda --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+aws iam delete-role-policy --role-name trainer-agent-frontdoor-lambda --policy-name trainer-agent-frontdoor-permissions
+aws iam delete-role --role-name trainer-agent-frontdoor-lambda
+aws secretsmanager delete-secret --secret-id trainer-agent/frontdoor-bearer --region us-west-2 --force-delete-without-recovery
+```
+
 ## Still planned (from TODO.md, mountain: "Deployed & wired up")
 
-- **Bearer-token auth**: the runtime is currently invoked with IAM/SigV4
-  (default). Add an authorizer so the calling app uses a shared bearer secret
-  (`--authorizer-configuration` on the runtime).
 - **Secrets Manager secret** holding the fine-grained GitHub PAT (fetched at
   runtime, never baked into the image) — needed once the agent opens PRs.
-- **Wire my app** to invoke the runtime with a stable `runtimeSessionId`.
+- **Wire my app** to POST the front-door Function URL with the bearer + a stable
+  `session_id` (and a `traceparent` to continue its trace).
 
 (The IAM execution-role policy already grants Bedrock `InvokeModel` and X-Ray, so
 the real agent loop and OTel can land without a permissions change.)

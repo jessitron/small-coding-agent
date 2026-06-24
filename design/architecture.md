@@ -96,11 +96,18 @@ framework (Strands) emitting standard OTel to Honeycomb.
 - Custom spans for the `git clone` and `open_pr` steps.
 - One trace per invoke, and it's **not** rooted at the agent: the trace starts
   in the other app's backend and the agent's spans join it via propagated trace
-  context (backend → Lambda → AgentCore). Tie the trace to the AgentCore
-  `session_id`.
+  context (app → front-door Lambda → AgentCore). Tie the trace to the AgentCore
+  `session_id`. **Propagation mechanism** (see `notes/telemetry.md`): app→Lambda
+  is W3C `traceparent` over HTTP; Lambda→agent rides in the invoke **payload**
+  (`traceparent`/`tracestate`), because AgentCore forwards only `baggage` to the
+  container, not the `InvokeAgentRuntime` `traceParent` param.
 
 ## Open questions / not yet decided
 
 - Exact deploy mechanism (starter toolkit CodeBuild vs. own Dockerfile). JESS: I like Dockerfiles
 - Whether to adopt AgentCore Memory now or after v1. JESS: after v1
-- How the other app authenticates to InvokeAgentRuntime (IAM). JESS: an open web endpoint plus a bearer auth token that's validated. I'm connecting 1 app to this one, so I can give that app the same secret
+- ~~How the other app authenticates to InvokeAgentRuntime (IAM).~~ **RESOLVED
+  2026-06-24**: a front-door Lambda behind a **public Function URL** validates a
+  shared **bearer** secret, then proxies to `InvokeAgentRuntime` via SigV4. Not
+  AgentCore's native authorizer (wants OIDC/JWT, not a static secret), not API
+  Gateway (29s timeout). See `notes/decisions.md` + `notes/infrastructure.md`.

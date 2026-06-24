@@ -46,6 +46,25 @@ separate collector. If we ever want our own env: deploy our own Boswell (the
   a producer-side `SpanProcessor` can't lift them onto the span. Boswell's OTTL
   transform does. Not exercised yet (agent only says "hi").
 
+## Trace propagation — app → front door → agent (one trace)
+
+The trace starts in the **caller**, not the agent. Three services, one trace
+(`trainer-agent-test-client → trainer-agent-frontdoor → trainer-agent`), proven
+by `scripts/propagation-test.sh`.
+
+- **app → front door**: standard W3C — the caller injects `traceparent` into the
+  HTTP request to the Function URL; the Lambda `extract()`s it from the headers.
+- **front door → agent**: **not** standard headers. AgentCore forwards only the
+  `baggage` header to the container, and does **not** forward the
+  `InvokeAgentRuntime` `traceParent`/`traceState` params (it consumes them for its
+  own internal trace linkage). So the front door puts `traceparent`/`tracestate`
+  in the invoke **payload**, and the agent extracts from the payload (with a header
+  fallback). See the gotcha in `notes/infrastructure.md`. Open follow-up in TODO.md:
+  is there a standard mechanism that works through AgentCore?
+- **Front-door processor**: `SimpleSpanProcessor` (synchronous export), because
+  Lambda freezes the env on return and would suspend a `BatchSpanProcessor`'s
+  background thread. The agent keeps Batch+flush (many spans per turn).
+
 ## Running it
 
 - **Start the local collector**: `scripts/start-collector.sh` (delegates to

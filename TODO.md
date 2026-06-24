@@ -8,11 +8,9 @@ A trailing `←` comment carries `mountain:`, `priority:`, `tag:`, `standing`.
 
 ## Next
 
-- [x] Eyeball a trace in Honeycomb (team `modernity`, envs `local` + `cynditaylor-com-bot`) ← Safe Harbor; DONE 2026-06-24
-  - Confirmed via the `honeycomb-modernity` MCP: `agent.invocation` span in both envs, `service.name=trainer-agent`, `agent.status=chatting`, `collector.boswell=washere` (proves the Boswell path). **Safe Harbor reached.**
 - [ ] Verify warm-VM batching delivers end-of-session spans without per-invoke flush; if so, drop the flush to protect chat latency ← Safe Harbor; priority: medium
-- [ ] Add an authed web endpoint — open endpoint + bearer-token validation (shared secret with my app) ← mountain: Deployed & wired up; priority: medium
-- [ ] Wire my app to invoke the agent (InvokeAgentRuntime with a stable runtimeSessionId) and show the reply ← mountain: Deployed & wired up; priority: medium
+- [ ] Wire my app to invoke the agent — POST to the front-door Function URL with the bearer + a stable `session_id` (and a `traceparent`), show the reply ← mountain: Deployed & wired up; priority: medium
+  - The front door is live (see done.md 2026-06-24): `POST <function-url>` with `Authorization: Bearer <secret>` and `{"message","session_id"}`. The app should start a span and inject `traceparent` so its trace continues through frontdoor → agent. `scripts/propagation_test.py` is a working reference client.
 
 ## Backlog
 
