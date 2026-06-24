@@ -8,7 +8,6 @@ A trailing `←` comment carries `mountain:`, `priority:`, `tag:`, `standing`.
 
 ## Next
 
-- [ ] Scaffold the Python project (Strands Agents + `bedrock-agentcore`) with a minimal `BedrockAgentCoreApp` + `@app.entrypoint` that replies "hi" ← mountain: Deployed & wired up; priority: high
 - [ ] Write the Dockerfile for the agent image (deploy via Dockerfile, not starter-toolkit CodeBuild) ← mountain: Deployed & wired up; priority: high
 - [ ] Deploy the agent to Bedrock AgentCore Runtime ← mountain: Deployed & wired up; priority: high
 - [ ] Add an authed web endpoint — open endpoint + bearer-token validation (shared secret with my app) ← mountain: Deployed & wired up; priority: medium
