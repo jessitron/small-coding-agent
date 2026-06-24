@@ -69,3 +69,12 @@ rises to next, but full deployment isn't the bar today.
 - **Owning the chat UI / websocket** — that belongs to the *other* app; this repo
   is just the invokable agent.
 - **Multiple repos or multiple PRs per session** — one repo, one task, one PR.
+
+## Tracking
+
+Where the live work for this project is recorded. (Adapter contract:
+`seamapping/TRACKING-ADAPTER.md`.)
+
+- backend: in-repo
+
+Open work lives in `TODO.md`; durable learnings and a done-log live in `notes/`.
