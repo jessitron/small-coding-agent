@@ -37,3 +37,14 @@ Completed landings, newest at the bottom. (In-repo tracking; see `SEAMAP.md` §T
     us-west-2 on the first run, creating resources in the wrong region and failing
     role validation (trust `SourceArn` pinned to us-west-2). Fix: scripts pin
     `export AWS_REGION=us-west-2` rather than inheriting it.
+
+- **Telemetry via Boswell — local wired** ← Safe Harbor (see the agent in Honeycomb)
+  - Reuse cyndibot's **Boswell** collector instead of our own (decision below).
+    `src/agent/observability.py` emits an `agent.invocation` span per invoke →
+    `BatchSpanProcessor` → OTLP. `service.name=trainer-agent`.
+  - Local: `scripts/start-collector.sh` (delegates to cyndibot's `./run`); `.env`
+    points OTLP at `localhost:4318`. Verified: the span reaches the collector.
+  - Prod wiring **ready but not deployed** in `deploy.sh` (Boswell Lambda URL +
+    token fetched at deploy time). Held until the Honeycomb ingest incident clears.
+  - **Not yet confirmed in Honeycomb** (team `modernity`, env `local`): ingest
+    incident + no `modernity` MCP in-session. See `notes/telemetry.md`.

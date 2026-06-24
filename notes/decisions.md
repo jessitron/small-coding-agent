@@ -27,3 +27,19 @@ Running log of choices made with Jessitron, newest at the bottom.
 - **One trace, rooted in the backend**: the trace starts in the other app's
   backend and the agent's spans join it via propagated trace context (backend →
   Lambda → AgentCore) — the agent is *not* the trace root.
+
+## 2026-06-24 — telemetry collector: reuse cyndibot's Boswell
+
+- **Reuse Boswell, don't run our own collector.** Boswell is the OTel collector
+  in the neighboring cyndibot repo. Rejected running a collector *inside* the
+  AgentCore microVM because of the freeze problem (the in-VM collector's buffer
+  freezes between invokes). Reuse over extract: cheaper, and cyndibot already
+  operates it.
+  - **local** → Boswell collector container (`localhost:4318`), started from here
+    via cyndibot's `./run` (documented cross-repo dependency).
+  - **prod** → the Boswell **Lambda**, same as cyndibot.
+- **Accepted caveat**: prod traces land in cyndibot's Honeycomb env
+  (`cynditaylor-com-bot`, team `modernity`), separated by `service.name`. Chosen
+  over standing up a separate collector/env. ("ohwell")
+- **Deferred**: extracting Boswell into a shared component — captured as a
+  follow-up, not done now. See `notes/telemetry.md` for the full wiring.

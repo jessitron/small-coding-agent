@@ -23,12 +23,22 @@ health check at ``GET /ping``.
 """
 
 from bedrock_agentcore import BedrockAgentCoreApp
+from dotenv import load_dotenv
+from opentelemetry import trace
+
+from agent.observability import configure_tracing, flush
+
+# Load local .env (OTEL_* etc.) before configuring tracing. In prod there is no
+# .env in the image; the AgentCore runtime supplies the env vars and this no-ops.
+load_dotenv()
+configure_tracing()
 
 app = BedrockAgentCoreApp()
+_tracer = trace.get_tracer("agent.main")
 
 
 @app.entrypoint
-def invoke(payload):
+def invoke(payload, context=None):
     """Handle one chat turn.
 
     Request/response follow the invoke contract in ``design/architecture.md``:
@@ -37,10 +47,23 @@ def invoke(payload):
         response: {"reply": "...", "status": "chatting|coding|asking|done|error",
                    "pr_url": "https://github.com/.../pull/123"}
 
-    ``runtimeSessionId`` is carried by AgentCore, not in the body.
+    ``runtimeSessionId`` is carried by AgentCore (on ``context``), not in the body.
+    Each turn is one ``agent.invocation`` span; spans are flushed before returning
+    so they leave the microVM before AgentCore may freeze it.
     """
-    _message = payload.get("message", "")
-    return {"reply": "hi", "status": "chatting"}
+    message = payload.get("message", "")
+    session_id = getattr(context, "session_id", None)
+
+    with _tracer.start_as_current_span("agent.invocation") as span:
+        if session_id:
+            span.set_attribute("session.id", session_id)
+        span.set_attribute("agent.message", message)
+        reply = {"reply": "hi", "status": "chatting"}
+        span.set_attribute("agent.reply", reply["reply"])
+        span.set_attribute("agent.status", reply["status"])
+
+    flush()
+    return reply
 
 
 def main():

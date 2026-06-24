@@ -33,6 +33,13 @@ runtime (idempotent); `scripts/cloud-smoke.sh` invokes the deployed runtime.
 `AWS_DEFAULT_REGION` (this machine is us-east-1). All AWS resources are recorded
 in `notes/infrastructure.md`.
 
+## Telemetry (see `notes/telemetry.md`)
+Traces go through **Boswell** (the OTel collector in the neighboring cyndibot
+repo) to Honeycomb **team `modernity`** — local→env `local`, prod→env
+`cynditaylor-com-bot` (shared with cyndibot; filter `service.name=trainer-agent`).
+**Verify traces in team `modernity`, not the Demo team the Honeycomb MCP shows.**
+`scripts/start-collector.sh` starts the local collector (depends on the cyndibot repo).
+
 ## Conventions
 - Stack: Python + Strands Agents + `bedrock-agentcore`. Observability is
   first-class: standard OTel to Honeycomb, raw LLM I/O captured on spans.

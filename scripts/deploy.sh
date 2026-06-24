@@ -65,7 +65,25 @@ aws iam put-role-policy --role-name "$ROLE_NAME" \
 ROLE_ARN="$(aws iam get-role --role-name "$ROLE_NAME" --query 'Role.Arn' --output text)"
 echo "== role arn: $ROLE_ARN"
 
-# 4. AgentCore runtime (create or update) ------------------------------------
+# 4. Telemetry env — route prod traces through the shared Boswell collector ---
+# Same Boswell Lambda cyndibot uses (see notes/telemetry.md). The Function URL is
+# public; the ingest token is fetched from the Lambda's config at deploy time so
+# it never lives in a committed file. Our traces land in the shared Honeycomb env
+# (cynditaylor-com-bot), separated by service.name=trainer-agent.
+BOSWELL_TRACES_URL="https://45exz5ki5veyvldhaojdynf3ty0pqnno.lambda-url.us-west-2.on.aws/v1/traces"
+BOSWELL_TOKEN="$(aws lambda get-function-configuration --function-name boswell --region "$REGION" \
+  --query 'Environment.Variables.INGEST_BEARER_TOKEN' --output text 2>/dev/null || echo '')"
+ENV_ARGS=()
+if [ -n "$BOSWELL_TOKEN" ] && [ "$BOSWELL_TOKEN" != "None" ]; then
+  ENV_JSON="$(printf '{"OTEL_SERVICE_NAME":"trainer-agent","OTEL_EXPORTER_OTLP_PROTOCOL":"http/protobuf","OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"%s","OTEL_EXPORTER_OTLP_HEADERS":"authorization=Bearer %s"}' \
+    "$BOSWELL_TRACES_URL" "$BOSWELL_TOKEN")"
+  ENV_ARGS=(--environment-variables "$ENV_JSON")
+  echo "== telemetry: routing prod traces through Boswell ($BOSWELL_TRACES_URL)"
+else
+  echo "== WARN: could not fetch Boswell ingest token; deploying WITHOUT telemetry env"
+fi
+
+# 5. AgentCore runtime (create or update) ------------------------------------
 EXISTING_ID="$(aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
   --query "agentRuntimes[?agentRuntimeName=='${RUNTIME_NAME}'].agentRuntimeId | [0]" \
   --output text 2>/dev/null || echo "None")"
@@ -81,6 +99,7 @@ if [ "$EXISTING_ID" = "None" ] || [ -z "$EXISTING_ID" ]; then
         --network-configuration '{"networkMode":"PUBLIC"}' \
         --protocol-configuration '{"serverProtocol":"HTTP"}' \
         --description "Trainer Agent — trains mtg-deck-shuffler; says hi (scaffold)" \
+        ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} \
         >/tmp/agentcore-create.json 2>/tmp/agentcore-create.err; then
       cat /tmp/agentcore-create.json
       break
@@ -96,10 +115,11 @@ else
     --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${IMAGE_TAG}\"}}" \
     --role-arn "$ROLE_ARN" \
     --network-configuration '{"networkMode":"PUBLIC"}' \
-    --protocol-configuration '{"serverProtocol":"HTTP"}'
+    --protocol-configuration '{"serverProtocol":"HTTP"}' \
+    ${ENV_ARGS[@]+"${ENV_ARGS[@]}"}
 fi
 
-# 5. Wait for READY ----------------------------------------------------------
+# 6. Wait for READY ----------------------------------------------------------
 RUNTIME_ID="$(aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
   --query "agentRuntimes[?agentRuntimeName=='${RUNTIME_NAME}'].agentRuntimeId | [0]" --output text)"
 RUNTIME_ARN="$(aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
