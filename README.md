@@ -9,31 +9,18 @@ the invoke contract.
 
 ## Architecture
 
-```
-  ┌────────────────────────────┐
-  │     MTG Deck Shuffler UI    │   chat in the browser
-  └──────────────┬─────────────┘
-                 │  websocket
-                 ▼
-  ┌────────────────────────────┐
-  │   MTG Deck Shuffler backend │   owns the chat + conversation history
-  └──────────────┬─────────────┘
-                 │  HTTPS (bearer token)
-                 ▼
-  ┌────────────────────────────┐
-  │    Lambda (HTTP endpoint)   │   fulfills the endpoint, invokes AgentCore
-  └──────────────┬─────────────┘
-                 │  InvokeAgentRuntime (runtimeSessionId)
-                 ▼
-  ┌────────────────────────────┐
-  │        Trainer Agent        │   Strands agent: gathers requirements,
-  │     (AgentCore Runtime)     │   codes on a branch, opens the PR
-  └──────────────┬─────────────┘
-                 │  git push + gh pr create
-                 ▼
-  ┌────────────────────────────┐
-  │           GitHub            │   jessitron/mtg-deck-shuffler → PR
-  └────────────────────────────┘
+```mermaid
+flowchart TD
+    UI["MTG Deck Shuffler UI<br/><i>chat in the browser</i>"]
+    Backend["MTG Deck Shuffler backend<br/><i>owns the chat + conversation history</i>"]
+    Lambda["Lambda<br/><i>fulfills the HTTP endpoint</i>"]
+    Agent["Trainer Agent — AgentCore Runtime<br/><i>Strands agent: gathers requirements,<br/>codes on a branch, opens the PR</i>"]
+    GitHub["GitHub<br/><i>jessitron/mtg-deck-shuffler → PR</i>"]
+
+    UI -->|websocket| Backend
+    Backend -->|HTTPS, bearer token| Lambda
+    Lambda -->|InvokeAgentRuntime, runtimeSessionId| Agent
+    Agent -->|git push + gh pr create| GitHub
 ```
 
 | Hop | How |
