@@ -1,8 +1,14 @@
 # Integrating with the Trainer Agent (front door)
 
+> **Interface version: 1.0** — this document IS the spec for that version. The
+> running service advertises the same version on every response
+> (`X-Trainer-Agent-Interface-Version`), and this doc and the service are bumped
+> together. See [Versioning](#versioning) and [Changelog](#changelog).
+
 **Audience:** the app that talks to the Trainer Agent — `jessitron/mtg-deck-shuffler`.
-This is everything you need to call the agent and show its replies. You do **not**
-need AWS credentials or the AWS SDK — just HTTPS and a bearer token.
+This is everything you need to call the agent and show its replies. You only need
+HTTPS + a bearer token to *call* it; you need AWS access once, to *fetch* the token
+(below).
 
 ## What this is
 
@@ -29,12 +35,23 @@ Send the shared secret as a bearer token:
 Authorization: Bearer <TRAINER_AGENT_TOKEN>
 ```
 
-- Jessitron will give you the token value. Store it as a **secret / env var** in
-  the app's deployment (e.g. `TRAINER_AGENT_TOKEN`). **Do not commit it.**
 - A missing/wrong token gets `401 {"error":"unauthorized"}`.
-- (For reference, the source of truth is AWS Secrets Manager
-  `trainer-agent/frontdoor-bearer` in account 414852377253, us-west-2. The app
-  shouldn't read that directly — it just needs the value in its own config.)
+
+### Fetching the token
+
+The token lives in AWS Secrets Manager. If you have AWS access to the
+`jessitron-sandbox` account (profile `sandbox`, us-west-2), fetch it yourself:
+
+```bash
+aws secretsmanager get-secret-value \
+  --profile sandbox --region us-west-2 \
+  --secret-id trainer-agent/frontdoor-bearer \
+  --query SecretString --output text
+```
+
+Put the result in the app's config as a **secret / env var** (e.g.
+`TRAINER_AGENT_TOKEN`) — **do not commit it**. Re-run the command if the secret is
+rotated.
 
 ## Request
 
@@ -102,6 +119,23 @@ standard `traceparent` over HTTP is all the front door needs:
 No extra fields in the body are required from you — the `traceparent` **header**
 is enough.
 
+## Versioning
+
+This interface is versioned `MAJOR.MINOR` (currently **1.0**). MAJOR bumps on a
+breaking change; MINOR on a backward-compatible addition. The doc and the running
+service are bumped together — this doc is the spec for the version it names at the
+top.
+
+- **The service advertises its version** on every response:
+  `X-Trainer-Agent-Interface-Version: 1.0`.
+- **You should declare yours** by sending the same header on each **request**, set
+  to the version you built against (e.g. `X-Trainer-Agent-Interface-Version: 1.0`).
+- **A mismatch is a warning, not an error.** The front door never rejects a
+  request over version; it records *both* versions on its trace span
+  (`frontdoor.interface_version` = the service's, `frontdoor.client_interface_version`
+  = yours). Drift is caught in Honeycomb, not at runtime. Sending the header is how
+  you make that signal useful — if you omit it, the client version logs as `unset`.
+
 ## Examples
 
 ### curl
@@ -110,6 +144,7 @@ is enough.
 curl -sS -XPOST "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/" \
   -H "Authorization: Bearer $TRAINER_AGENT_TOKEN" \
   -H 'Content-Type: application/json' \
+  -H 'X-Trainer-Agent-Interface-Version: 1.0' \
   -d '{"message":"Add a shuffle-animation toggle to the deck view","session_id":"mtg-deck-shuffler-3f9c1e6a-2b7d-4a55-9e21-abc123def456"}'
 ```
 
@@ -125,6 +160,7 @@ def ask_trainer(message: str, session_id: str) -> dict:
     headers = {
         "Authorization": f"Bearer {os.environ['TRAINER_AGENT_TOKEN']}",
         "Content-Type": "application/json",
+        "X-Trainer-Agent-Interface-Version": "1.0",  # the version you built against
     }
     inject(headers)  # adds W3C `traceparent` so the trace continues into the agent
     body = json.dumps({"message": message, "session_id": session_id}).encode()
@@ -147,6 +183,7 @@ async function askTrainer(message: string, sessionId: string) {
     headers: {
       "Authorization": `Bearer ${process.env.TRAINER_AGENT_TOKEN}`,
       "Content-Type": "application/json",
+      "X-Trainer-Agent-Interface-Version": "1.0", // the version you built against
       // If you use OTel, inject `traceparent` here so the trace continues.
     },
     body: JSON.stringify({ message, session_id: sessionId }),
@@ -163,3 +200,10 @@ async function askTrainer(message: string, sessionId: string) {
 2. For each user message: `POST` with that `session_id`; render `reply`.
 3. While `status` is `chatting`/`asking`/`coding`, keep letting the user reply.
 4. When `pr_url` appears, surface the PR link. `status: done` ends the task.
+
+## Changelog
+
+- **1.0** (2026-06-24) — initial interface. `POST` with `{message, session_id}` +
+  bearer auth over the Function URL; response `{reply, status, pr_url?}`; optional
+  `traceparent` header for trace propagation; `X-Trainer-Agent-Interface-Version`
+  on requests (client) and responses (service).

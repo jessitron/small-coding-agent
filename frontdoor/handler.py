@@ -145,7 +145,15 @@ def lambda_handler(event, context):
         "frontdoor.invoke", context=parent_ctx, kind=SpanKind.SERVER
     ) as span:
         span.set_attribute("session.id", session_id)
+        # Record both the version we implement and the one the client declares
+        # (via the same header on the request). A mismatch is a WARNING, surfaced
+        # in telemetry — never an error; we don't reject on it. Compare the two in
+        # Honeycomb to spot drift.
         span.set_attribute("frontdoor.interface_version", INTERFACE_VERSION)
+        span.set_attribute(
+            "frontdoor.client_interface_version",
+            _header(headers, "x-trainer-agent-interface-version") or "unset",
+        )
         # Lambda cost rate (dollars derived downstream as rate x duration).
         span.set_attribute("lambda.cost.rate_gb_second", RATE_GB_SECOND)
         span.set_attribute("lambda.cost.rate_per_request", RATE_PER_REQUEST)
