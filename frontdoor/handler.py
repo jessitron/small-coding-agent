@@ -143,10 +143,18 @@ def lambda_handler(event, context):
             span.set_attribute("lambda.memory_gb", int(mem_mb) / 1024)
 
         # Inject *this* span's context so the agent parents onto the frontdoor
-        # span. carrier -> native InvokeAgentRuntime params (AgentCore forwards
-        # them to the agent as request headers).
+        # span. AgentCore does NOT forward the native traceParent/traceState
+        # params to the container as headers (only `baggage` is forwarded), so
+        # the reliable channel to the agent is the PAYLOAD: we carry the W3C
+        # context in the body and the agent extracts it. We still pass the native
+        # params too, for AgentCore's own internal trace linkage.
         carrier = {}
         inject(carrier)
+        agent_payload = {"message": message}
+        if carrier.get("traceparent"):
+            agent_payload["traceparent"] = carrier["traceparent"]
+        if carrier.get("tracestate"):
+            agent_payload["tracestate"] = carrier["tracestate"]
         trace_kwargs = {}
         if carrier.get("traceparent"):
             trace_kwargs["traceParent"] = carrier["traceparent"]
@@ -161,7 +169,7 @@ def lambda_handler(event, context):
                 runtimeSessionId=session_id,
                 contentType="application/json",
                 accept="application/json",
-                payload=json.dumps({"message": message}).encode("utf-8"),
+                payload=json.dumps(agent_payload).encode("utf-8"),
                 **trace_kwargs,
             )
         except Exception as exc:  # surface upstream failures as 502, on the span

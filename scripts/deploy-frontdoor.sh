@@ -160,10 +160,16 @@ else
   aws lambda create-function-url-config --function-name "$LAMBDA_NAME" --region "$REGION" \
     --auth-type NONE >/dev/null
 fi
-# Public invoke permission for the Function URL (idempotent).
+# Public invoke permissions for the Function URL (idempotent). A public (NONE)
+# Function URL needs BOTH statements as of Oct 2025 — `InvokeFunctionUrl` alone
+# gets a silent 403 AccessDeniedException at the URL gate with no Lambda logs.
+# See https://www.honeycomb.io/blog/running-opentelemetry-collector-lambda
 aws lambda add-permission --function-name "$LAMBDA_NAME" --region "$REGION" \
   --statement-id frontdoor-public-url --action lambda:InvokeFunctionUrl \
   --principal '*' --function-url-auth-type NONE >/dev/null 2>&1 || true
+aws lambda add-permission --function-name "$LAMBDA_NAME" --region "$REGION" \
+  --statement-id frontdoor-public-invoke --action lambda:InvokeFunction \
+  --principal '*' --invoked-via-function-url >/dev/null 2>&1 || true
 
 FUNCTION_URL="$(aws lambda get-function-url-config --function-name "$LAMBDA_NAME" --region "$REGION" \
   --query 'FunctionUrl' --output text)"

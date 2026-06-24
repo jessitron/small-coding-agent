@@ -53,19 +53,25 @@ def invoke(payload, context=None):
     so they leave the microVM before AgentCore may freeze it.
 
     The trace does **not** start here: the caller (the front-door Lambda, and
-    behind it the app) propagates W3C trace context via the ``InvokeAgentRuntime``
-    ``traceParent``/``traceState``/``baggage`` params. AgentCore forwards those as
-    request headers (see ``context.request_headers``), and we extract them so
-    ``agent.invocation`` joins the caller's trace instead of rooting its own. If
-    no context is forwarded (e.g. a bare ``cloud-smoke`` invoke), we root a span.
+    behind it the app) propagates W3C trace context so ``agent.invocation`` joins
+    the caller's trace instead of rooting its own. AgentCore does **not** forward
+    the ``InvokeAgentRuntime`` ``traceParent``/``traceState`` params to the
+    container as request headers (only ``baggage`` is forwarded), so the front
+    door carries the context in the **payload** (``traceparent``/``tracestate``).
+    We prefer the payload and fall back to any forwarded headers. If no context
+    is present (e.g. a bare ``cloud-smoke`` invoke), we root a span.
     """
     message = payload.get("message", "")
     session_id = getattr(context, "session_id", None)
 
-    # Extract propagated trace context from the forwarded request headers. Keys
-    # may arrive in any case (HTTP/2 lowercases; HTTP/1.1 may not), so normalize.
+    # Build a W3C carrier from the payload (primary channel), falling back to any
+    # forwarded request headers. Header keys may arrive in any case, so normalize.
     headers = getattr(context, "request_headers", None) or {}
     carrier = {k.lower(): v for k, v in headers.items()}
+    if payload.get("traceparent"):
+        carrier["traceparent"] = payload["traceparent"]
+    if payload.get("tracestate"):
+        carrier["tracestate"] = payload["tracestate"]
     parent_ctx = extract(carrier)
 
     with _tracer.start_as_current_span("agent.invocation", context=parent_ctx) as span:
