@@ -1,8 +1,8 @@
 # small-coding-agent
 
 A single-purpose coding agent on Amazon Bedrock AgentCore Runtime. It chats with
-a human via another app's websocket, implements a coding task on
-`jessitron/mtg-deck-shuffler`, and opens a PR.
+a human via another app (synchronous HTTP request/response), implements a coding
+task on `jessitron/mtg-deck-shuffler`, and opens a PR.
 
 ## Seamap
 

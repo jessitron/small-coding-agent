@@ -63,11 +63,11 @@ rises to next, but full deployment isn't the bar today.
 ## Non-goals
 - **Generalizing across many apps** — the reusable "drop this agent into any app"
   capability is the North Star concept but explicitly another day's work.
-- **AgentCore Memory** — deferred until after v1; conversation state lives in the
-  session workspace dir for now.
+- **AgentCore Memory** — deferred until after v1. Conversation history is owned by
+  the *other* app's backend, so there's no agent-side conversation store to manage.
 - **Streaming responses** — request/response is fine.
-- **Owning the chat UI / websocket** — that belongs to the *other* app; this repo
-  is just the invokable agent.
+- **Owning the chat UI** — that belongs to the *other* app; this repo is just the
+  invokable agent, reached over synchronous HTTP.
 - **Multiple repos or multiple PRs per session** — one repo, one task, one PR.
 
 ## Tracking

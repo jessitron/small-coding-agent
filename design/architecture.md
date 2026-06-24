@@ -1,24 +1,25 @@
 # small-coding-agent — architecture
 
 A single-purpose coding agent that runs on **Amazon Bedrock AgentCore Runtime**.
-It chats with a human (over a websocket owned by _another_ app), figures out a
-coding task, implements it on a branch of **one** repo
+It chats with a human (through _another_ app, over synchronous HTTP), figures out
+a coding task, implements it on a branch of **one** repo
 (`jessitron/mtg-deck-shuffler`), opens a PR, and sends the PR link back over chat.
 
 ## Outer shape
 
 ```
-chat UI ──ws──> other app ──InvokeAgentRuntime(runtimeSessionId, {message})──> AgentCore Runtime
-                   ▲                                                              │
-                   └──────────── {reply, status, pr_url?} ◀──────────────────────┘
+chat UI ──http──> other app ──InvokeAgentRuntime(runtimeSessionId, {message})──> AgentCore Runtime
+                     ▲                                                              │
+                     └──────────── {reply, status, pr_url?} ◀──────────────────────┘
 ```
 
-- The **other app** owns the websocket to the user and the chat UI. It calls
-  AgentCore's invoke endpoint **once per user message**, passing a stable
-  `runtimeSessionId`.
-- Our agent is request/response (no streaming required). AgentCore keeps the
-  session's microVM warm and gives it session affinity, so disk + memory persist
-  across invokes within a session.
+- The **other app** owns the chat UI and the conversation history. It calls
+  AgentCore's invoke endpoint **once per user message** (synchronous HTTP
+  request/response), passing a stable `runtimeSessionId`.
+- The whole path — backend → Lambda → agent — is synchronous and joins **one
+  trace** that starts in the other app's backend (see Observability). No
+  streaming required. AgentCore keeps the session's microVM warm and gives it
+  session affinity, so disk + memory persist across invokes within a session.
 - Sessions are expected to be short-lived. It is acceptable to fail if AgentCore's VM times out between chat messages, although let's make it clear to the user and telemetry when that happens.
 
 ## The agent
@@ -93,7 +94,10 @@ framework (Strands) emitting standard OTel to Honeycomb.
   (strands-agents/sdk-python#822). We capture it via a trace-correlated log
   record (logs carry `trace_id`/`span_id`), so it's reachable from the trace.
 - Custom spans for the `git clone` and `open_pr` steps.
-- One trace per invoke; tie the trace to the AgentCore `session_id`.
+- One trace per invoke, and it's **not** rooted at the agent: the trace starts
+  in the other app's backend and the agent's spans join it via propagated trace
+  context (backend → Lambda → AgentCore). Tie the trace to the AgentCore
+  `session_id`.
 
 ## Open questions / not yet decided
 

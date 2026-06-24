@@ -12,13 +12,15 @@ the invoke contract.
 ```mermaid
 flowchart TD
     UI["MTG Deck Shuffler UI<br/><i>chat in the browser</i>"]
-    Backend["MTG Deck Shuffler backend<br/><i>owns the chat + conversation history</i>"]
-    Lambda["Lambda<br/><i>fulfills the HTTP endpoint</i>"]
-    Agent["Trainer Agent — AgentCore Runtime<br/><i>Strands agent: gathers requirements,<br/>codes on a branch, opens the PR</i>"]
+    subgraph trace["one synchronous trace — starts here"]
+        Backend["MTG Deck Shuffler backend<br/><i>owns the chat + conversation history</i>"]
+        Lambda["Lambda<br/><i>fulfills the HTTP endpoint</i>"]
+        Agent["Trainer Agent — AgentCore Runtime<br/><i>Strands agent: gathers requirements,<br/>codes on a branch, opens the PR</i>"]
+    end
     GitHub["GitHub<br/><i>jessitron/mtg-deck-shuffler → PR</i>"]
 
     UI -->|HTTP request/response| Backend
-    Backend -->|HTTPS, bearer token| Lambda
+    Backend -->|HTTPS + trace context, bearer token| Lambda
     Lambda -->|InvokeAgentRuntime, runtimeSessionId| Agent
     Agent -->|git push + gh pr create| GitHub
 
@@ -28,6 +30,9 @@ flowchart TD
 
 > 🟩 Green nodes (**Lambda** and **Trainer Agent**) are what lives in this repo.
 > The rest are external systems we talk to.
+>
+> ⛓️ The whole path is synchronous request/response and joins **one trace** that
+> starts in the backend; trace context propagates down each hop to the agent.
 
 | Hop | How |
 | --- | --- |
