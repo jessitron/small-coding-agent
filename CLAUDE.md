@@ -10,6 +10,19 @@ This repo's seamap — the chart and the tracking adapter — lives in `SEAMAP.m
 and log proactively; use `drop-buoy` to capture work without derailing. Work is tracked in Linear
 (project `small-coding-agent`, team `jessitron`).
 
+### Filing tickets to the app (`mtg-deck-shuffler`)
+
+We're free to file Linear issues for the app this agent serves. Coordinates (Linear,
+team `jessitron`, same workspace):
+- **project:** `MTG Deck Shuffler` (id `5046fea4-bc3c-4065-9234-3f70ca7fe0c6`)
+- **milestone:** attach to **`The Trainer`** (id `c35f234d-2e03-48e3-80a7-4a349a90f9ba`) — the
+  active milestone for the chat→PR loop.
+- **provenance:** end the issue description with `(- claude from small-coding-agent)`.
+
+So: `save_issue team:"jessitron", project:"MTG Deck Shuffler", milestone:"The Trainer",
+title:"…", description:"…\n\n(- claude from small-coding-agent)"`. Search for a near-duplicate
+first; update it instead of filing a second.
+
 ## Notes for future me
 - `INTERFACE.md` (repo root) — **the canonical interface spec**: the single file
   consumers copy into their repo. Defines three interfaces — conceptual (what the
