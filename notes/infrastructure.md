@@ -62,6 +62,15 @@ by **`scripts/deploy-frontdoor.sh`** (idempotent; the source of truth). The app
 POSTs JSON with a shared **bearer** to a public Function URL; the Lambda validates
 it and proxies to `InvokeAgentRuntime` via SigV4. Smoke: `scripts/frontdoor-smoke.sh`.
 
+**Fetch the bearer token** (what `INTERFACE.md` points consumers here for):
+
+```bash
+aws secretsmanager get-secret-value \
+  --profile sandbox --region us-west-2 \
+  --secret-id trainer-agent/frontdoor-bearer \
+  --query SecretString --output text
+```
+
 | Resource | Type | Name / ARN | Notes |
 |----------|------|------------|-------|
 | Bearer secret | Secrets Manager | `trainer-agent/frontdoor-bearer` (`…-CCVd4Y`) | shared token the app presents; random `openssl rand -hex 32`; read at runtime by the Lambda |

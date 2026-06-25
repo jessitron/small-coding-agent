@@ -141,18 +141,14 @@ Authorization: Bearer <TRAINER_AGENT_TOKEN>
 
 A missing/wrong token gets `401 {"error":"unauthorized"}`.
 
-**Fetching the token.** It lives in AWS Secrets Manager. With AWS access to the
-`jessitron-sandbox` account (profile `sandbox`, us-west-2):
-
-```bash
-aws secretsmanager get-secret-value \
-  --profile sandbox --region us-west-2 \
-  --secret-id trainer-agent/frontdoor-bearer \
-  --query SecretString --output text
-```
-
-Put the result in your app's config as a **secret / env var** (e.g.
-`TRAINER_AGENT_TOKEN`) — **do not commit it**. Re-run if the secret is rotated.
+**Fetching the token.** It lives in AWS Secrets Manager in the trainer-agent's
+sandbox account. If you have AWS access, the exact `aws secretsmanager
+get-secret-value` command (account, profile, region, secret id) is in the
+trainer-agent repo's
+[`notes/infrastructure.md`](https://github.com/jessitron/small-coding-agent/blob/main/notes/infrastructure.md);
+otherwise ask Jessitron. Put the result in your app's config as a **secret / env
+var** (e.g. `TRAINER_AGENT_TOKEN`) — **do not commit it**. Re-run if the secret is
+rotated.
 
 ### Request
 
@@ -292,15 +288,10 @@ on every run). Run the **front-door stub**: a faithful stand-in that enforces th
 drift) but returns **canned** replies. Point your integration tests at it.
 
 The stub is a Docker image in private ECR. With AWS access to the account (the
-same access you used to fetch the token):
-
-```bash
-aws ecr get-login-password --profile sandbox --region us-west-2 \
-  | docker login --username AWS --password-stdin 414852377253.dkr.ecr.us-west-2.amazonaws.com
-
-docker run -p 8080:8080 -e STUB_BEARER=test-token \
-  414852377253.dkr.ecr.us-west-2.amazonaws.com/trainer-agent-frontdoor-stub:latest
-```
+same access you used to fetch the token), the ECR login + `docker run` commands
+(repo URI included) are in the trainer-agent repo's
+[`notes/infrastructure.md`](https://github.com/jessitron/small-coding-agent/blob/main/notes/infrastructure.md)
+under "Front-door test stub". Run it with `-p 8080:8080 -e STUB_BEARER=test-token`.
 
 Now hit `http://localhost:8080/` exactly as you would the real endpoint, using
 `test-token` as the bearer. Health check: `GET /ping`. (Built from the
