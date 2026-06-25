@@ -118,3 +118,60 @@ Running log of choices made with Jessitron, newest at the bottom.
   expectations to break.
 - This doc "is meant for *my* projects" (Jessitron's) — the collaboration half
   assumes the shared `honeycombio` Linear workspace, not a public API.
+
+## 2026-06-25 — making the agent real: instructions-in-the-repo + the session protocol
+
+The agent is still the "hi" stub. This is the design for Mountain 2 (*First PR
+from a script*) — what the real agent loop does. Decided with Jessitron:
+
+- **Instructions live in the target repo, not here.** On the first invoke of a
+  session the agent `git clone`s `mtg-deck-shuffler` and reads
+  **`trainer-agent/instructions.md`** from the clone — its standing brief for what
+  the app wants of it ("look at this recommendation and see if it could be better;
+  collaborate with the user; for more on each card, run this script…"). A visible
+  subdirectory (Jessitron's call: **not** dot-prefixed), so helper scripts the
+  instructions reference can live alongside (`trainer-agent/cards.sh`, etc.).
+  - **Why split it this way:** *this* repo owns **how to use the agent's tools**;
+    the *target* repo owns **what is wanted of us**. The brief changes with the
+    app, on the app's schedule, reviewed in the app's PRs — it shouldn't require a
+    Trainer-Agent deploy. `INTERFACE.md` specifies the *path*; the app fills it in.
+  - Missing/empty `trainer-agent/instructions.md` → honest `status: error`, not a
+    guess.
+
+- **Per-turn inputs** the agent reasons over: (1) the repo instructions, (2) the
+  user's `message`, (3) the **current game state**, supplied per request as an
+  opaque app-defined `state` object — the agent passes it into its reasoning; its
+  *shape* is defined by `trainer-agent/instructions.md`, not the wire contract, so
+  the contract stays stable while the meaning lives with the app. Deeper/reference
+  detail (e.g. per-card info) is pulled on demand via the repo's helper scripts,
+  not shipped in every request.
+
+- **The session protocol: a sequence number makes context-loss honest.** Each
+  request carries `seq`, a 1-based count of user messages in the session. The
+  agent persists how many turns it has handled and expects `seq == turns_seen + 1`.
+  A mismatch means the microVM is fresh / the session expired — **we no longer
+  have the game state**, so we can't safely continue. That's an **error**, not a
+  silent restart: `status: error`, a `reply` telling the user to start a **new
+  conversation** (new `session_id`), and a distinct marked span
+  (`agent.context_lost=true`, `agent.seq_expected`, `agent.seq_received`). This is
+  the concrete implementation of the SEAMAP "honest about session loss" promise.
+
+- **Two tools, two directions of collaboration:**
+  - `open_pr` — push the branch + open the PR on `mtg-deck-shuffler`, return
+    `pr_url`, stamp `pr.url` on the span. (Already designed; now built for real.)
+  - `request_app_change` — when the agent needs *its inputs* improved ("I really
+    need the deck's strategy in the input"), it files a **GitHub issue on
+    `jessitron/mtg-deck-shuffler`** (Jessitron's call). Reuses the GitHub PAT the
+    agent already has for PRs — self-contained, **no new secret/infra**, and the
+    request lands right next to the code. This is the reverse of `INTERFACE.md`'s
+    collaboration channel (app → agent via Linear); here the agent → app via
+    GitHub. A human can mirror to Linear if desired.
+
+- **This is a wire-contract change → `INTERFACE.md` goes to 2.0 *when it ships*,
+  not now.** New required `seq`, new `state`, and a new consumer obligation
+  (`trainer-agent/instructions.md` must exist) all break a 1.0 client — that's a
+  MAJOR bump. But the canonical spec and the running service **bump in lockstep**
+  (the 2026-06-24 versioning decision), and the running service is still the 1.0
+  stub. So the full v2.0 design is captured in `design/architecture.md` now;
+  `INTERFACE.md` flips to 2.0 as the behavior lands. (Drafting future behavior into
+  the live copy-able spec would make it lie about the deployed service.)
