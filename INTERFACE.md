@@ -329,11 +329,18 @@ trainer-agent repo's `frontdoor/`; `latest` tracks the current interface version
 
 ## Versioning
 
-The **technical interface** is versioned `MAJOR.MINOR` (currently **1.0**). MAJOR
-bumps on a breaking change; MINOR on a backward-compatible addition. The doc and
-the running service bump together — this doc is the spec for the version it names
-at the top. (The conceptual and collaboration sections above are conventions, not
-part of the version-gated wire contract.)
+This whole document is versioned `MAJOR.MINOR` (currently **1.0**) — **the version
+covers expectations, not just the wire bytes.** A change to what a consumer should
+*expect* — the conceptual framing, the collaboration convention, *or* the
+technical contract — is a version bump. MAJOR when the change could confuse or
+break someone who built against the old version; MINOR for an addition that
+doesn't invalidate what they already understood. The doc and the running service
+bump together — this doc is the spec for the version it names at the top.
+
+(The runtime can only enforce the *technical* half — that's what the
+`X-Trainer-Agent-Interface-Version` header below carries. The conceptual and
+collaboration changes ride the same number so that one version describes one
+coherent set of expectations.)
 
 - **The service advertises its version** on every response:
   `X-Trainer-Agent-Interface-Version: 1.0`.

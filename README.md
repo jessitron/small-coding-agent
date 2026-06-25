@@ -30,8 +30,11 @@ defines **three** interfaces, not just the endpoint:
   don't edit their copy or open a PR here. The two sibling repos
   (`small-coding-agent` and `mtg-deck-shuffler`) file issues for each other this
   way.
-- **The doc and the running service are versioned together** (the service
-  advertises `X-Trainer-Agent-Interface-Version`); keep them in lockstep.
+- **The version covers expectations, not just the wire bytes.** A change to what a
+  consumer should *expect* — conceptual, collaboration, or technical — is a version
+  bump (MAJOR if it could confuse/break someone on the old version, MINOR for a
+  non-invalidating addition). The doc and the running service bump together (the
+  service advertises `X-Trainer-Agent-Interface-Version`); keep them in lockstep.
 
 When the technical contract or these conventions change, update `INTERFACE.md` —
 it is the source of truth that everything downstream copies from.

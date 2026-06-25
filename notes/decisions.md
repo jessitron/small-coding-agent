@@ -105,9 +105,14 @@ Running log of choices made with Jessitron, newest at the bottom.
   get coding work done on your app; you *file a Linear issue* when the service
   itself must change. Contract changes are a Linear request, never a local edit to
   a copied doc.
-- **Scope note on versioning:** only the technical wire contract is version-gated
-  (the `X-Trainer-Agent-Interface-Version` header); the conceptual and
-  collaboration sections are conventions. The wire contract is unchanged, so this
-  stays **1.0** — the bump is in doc scope, not the protocol.
+- **The version covers expectations, not just the wire bytes** (Jessitron's call,
+  2026-06-25). A change to what a consumer should *expect* — conceptual framing,
+  collaboration convention, or technical contract — is a version bump: MAJOR when
+  it could confuse/break someone on the old version, MINOR for a non-invalidating
+  addition. The runtime can only enforce the technical half (the
+  `X-Trainer-Agent-Interface-Version` header), but all three ride the same number
+  so one version = one coherent set of expectations. Stays **1.0** for now only
+  because the consumer (`mtg-deck-shuffler`) hasn't seen this file yet — no
+  expectations to break.
 - This doc "is meant for *my* projects" (Jessitron's) — the collaboration half
   assumes the shared `honeycombio` Linear workspace, not a public API.
