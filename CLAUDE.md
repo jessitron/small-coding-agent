@@ -11,6 +11,11 @@ and log proactively; use `drop-buoy` to capture work without derailing. Work is 
 (project `small-coding-agent`, team `jessitron`).
 
 ## Notes for future me
+- `INTERFACE.md` (repo root) — **the canonical interface spec**: the single file
+  consumers copy into their repo. Defines three interfaces — conceptual (what the
+  agent is for), collaboration (request changes via Linear), and technical (the
+  HTTP contract). Source of truth; keep it and the running service versioned in
+  lockstep. Contract changes come in as Linear requests, not local edits.
 - `design/architecture.md` — the system design and the invoke contract.
 - `notes/decisions.md` — running log of decisions and *why* (read this first).
 - `notes/infrastructure.md` — everything we touch in AWS (profile `jessitron-sandbox` =

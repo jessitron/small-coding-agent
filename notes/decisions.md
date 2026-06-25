@@ -89,3 +89,25 @@ Running log of choices made with Jessitron, newest at the bottom.
   mismatch. Drift is detected in Honeycomb
   (`frontdoor.client_interface_version != frontdoor.interface_version`), not at
   runtime. (Jessitron's call — keep the boundary forgiving, make drift observable.)
+
+## 2026-06-25 — the interface is conceptual + collaboration + technical, in one file
+
+- **`INTERFACE.md` (repo root) is now the single canonical, copy-able spec**,
+  superseding `notes/frontdoor-integration.md` (which became a stub pointing to
+  it). It carries the interface version and changelog.
+- **It defines three interfaces, not one.** "Hit this endpoint" wasn't enough.
+  A consumer agent in another repo needs to understand (1) *what we're doing* —
+  the North Star / what the Trainer Agent is for; (2) *how to ask for changes to
+  the agent itself* — file a Linear development request in team `jessitron`,
+  project `small-coding-agent` (the two sibling repos file issues for each other);
+  and (3) *how to call the running service* — the HTTP wire contract.
+- **Two distinct channels, kept separate in the doc:** you *call* the endpoint to
+  get coding work done on your app; you *file a Linear issue* when the service
+  itself must change. Contract changes are a Linear request, never a local edit to
+  a copied doc.
+- **Scope note on versioning:** only the technical wire contract is version-gated
+  (the `X-Trainer-Agent-Interface-Version` header); the conceptual and
+  collaboration sections are conventions. The wire contract is unchanged, so this
+  stays **1.0** — the bump is in doc scope, not the protocol.
+- This doc "is meant for *my* projects" (Jessitron's) — the collaboration half
+  assumes the shared `honeycombio` Linear workspace, not a public API.
