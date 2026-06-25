@@ -92,9 +92,11 @@ Running log of choices made with Jessitron, newest at the bottom.
 
 ## 2026-06-25 — the interface is conceptual + collaboration + technical, in one file
 
-- **`INTERFACE.md` (repo root) is now the single canonical, copy-able spec**,
-  superseding `notes/frontdoor-integration.md` (which became a stub pointing to
-  it). It carries the interface version and changelog.
+- **`INTERFACE.md` (repo root) is now the single canonical, copy-able spec.** It
+  absorbed and replaced `notes/frontdoor-integration.md` (the old technical-only
+  spec), which was **deleted outright** — no consumer had pinned it yet, so there
+  was no back-compat to preserve with a redirect stub. It carries the interface
+  version and changelog.
 - **It defines three interfaces, not one.** "Hit this endpoint" wasn't enough.
   A consumer agent in another repo needs to understand (1) *what we're doing* —
   the North Star / what the Trainer Agent is for; (2) *how to ask for changes to

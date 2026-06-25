@@ -113,7 +113,7 @@ A validating stand-in for the front door, for mtg-deck-shuffler's local/CI testi
 Published by **`scripts/publish-stub.sh`**; built from `frontdoor/Dockerfile.stub`
 (stdlib-only `frontdoor/stub.py` + the shared `frontdoor/contract.py`). Enforces the
 same request contract as prod, returns canned replies. Usage doc:
-`notes/frontdoor-integration.md` §"Local testing — the stub".
+[`INTERFACE.md`](../INTERFACE.md) §"Local testing — the stub".
 
 | Resource | Type | Name / URI | Notes |
 |----------|------|------------|-------|

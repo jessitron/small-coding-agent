@@ -361,11 +361,8 @@ local edit.
 
 ## Changelog
 
-- **1.0** (2026-06-25) — `INTERFACE.md` becomes the single canonical, copy-able
-  spec, superseding `notes/frontdoor-integration.md`. Same wire contract as before
-  (`POST` `{message, session_id}` + bearer auth over the Function URL; response
-  `{reply, status, pr_url?}`; optional `traceparent`;
-  `X-Trainer-Agent-Interface-Version` on requests and responses), now framed
-  alongside the conceptual and collaboration interfaces.
-- **1.0** (2026-06-24) — initial technical interface (as
-  `notes/frontdoor-integration.md`).
+- **1.0** (2026-06-25) — initial interface. The conceptual, collaboration, and
+  technical interfaces in one spec. Wire contract: `POST` `{message, session_id}` +
+  bearer auth over the Function URL; response `{reply, status, pr_url?}`; optional
+  `traceparent` for trace propagation; `X-Trainer-Agent-Interface-Version` on
+  requests (client) and responses (service).
