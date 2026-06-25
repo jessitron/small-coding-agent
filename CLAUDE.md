@@ -7,7 +7,8 @@ task on `jessitron/mtg-deck-shuffler`, and opens a PR.
 ## Seamap
 
 This repo's seamap — the chart and the tracking adapter — lives in `SEAMAP.md`. Orient, capture,
-and log proactively; use `drop-buoy` to capture work without derailing. Open work is in `TODO.md`.
+and log proactively; use `drop-buoy` to capture work without derailing. Work is tracked in Linear
+(project `small-coding-agent`, team `jessitron`).
 
 ## Notes for future me
 - `design/architecture.md` — the system design and the invoke contract.

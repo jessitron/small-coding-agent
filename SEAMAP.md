@@ -68,6 +68,10 @@ traces that show the loop doing its job.
 Where the live work for this project is recorded. (Adapter contract:
 `seamapping/TRACKING-ADAPTER.md`.)
 
-- backend: in-repo
+- backend: linear
+- project: [small-coding-agent](https://linear.app/honeycombio/project/small-coding-agent-7218aea8c221)
+- team: jessitron
 
-Open work lives in `TODO.md`; durable learnings and a done-log live in `notes/`.
+The Mountains are Linear milestones. Durable learnings and a done-log still live
+in `notes/`. (The app `mtg-deck-shuffler` tracks in the same Linear team, so the
+two agents can file tasks for each other.)
