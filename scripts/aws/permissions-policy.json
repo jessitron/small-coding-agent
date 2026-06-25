@@ -50,6 +50,12 @@
       "Resource": "*"
     },
     {
+      "Sid": "GitHubPATSecretRead",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:us-west-2:414852377253:secret:trainer-agent/github-pat-*"
+    },
+    {
       "Sid": "WorkloadAccessToken",
       "Effect": "Allow",
       "Action": [

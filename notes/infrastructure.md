@@ -39,12 +39,29 @@ Created 2026-06-24 in **us-west-2**, account `414852377253`, profile `sandbox`.
 | Resource | Type | Name / ARN | Notes |
 |----------|------|------------|-------|
 | ECR repo | ECR | `414852377253.dkr.ecr.us-west-2.amazonaws.com/trainer-agent` | scanOnPush=true; holds the arm64 image, tagged by git sha + `latest` |
-| Execution role | IAM (global) | `arn:aws:iam::414852377253:role/trainer-agent-agentcore-runtime` | trust: `bedrock-agentcore.amazonaws.com` (SourceArn pinned us-west-2); inline policy `trainer-agent-runtime-permissions` (ECR pull, logs, X-Ray, Bedrock invoke, workload token) |
+| Execution role | IAM (global) | `arn:aws:iam::414852377253:role/trainer-agent-agentcore-runtime` | trust: `bedrock-agentcore.amazonaws.com` (SourceArn pinned us-west-2); inline policy `trainer-agent-runtime-permissions` (ECR pull, logs, X-Ray, Bedrock invoke, workload token, **GitHub PAT read**) |
 | AgentCore runtime | Bedrock AgentCore | `arn:aws:bedrock-agentcore:us-west-2:414852377253:runtime/trainer_agent-VyiY9TFdtC` (id `trainer_agent-VyiY9TFdtC`) | name `trainer_agent`; `networkMode=PUBLIC`, `serverProtocol=HTTP`; container artifact from the ECR image |
+| GitHub PAT secret | Secrets Manager | `trainer-agent/github-pat` (`…-VzKllL`) | fine-grained PAT for `jessitron/mtg-deck-shuffler` (Contents+PRs+Issues r/w); read at runtime by the agent (`src/agent/github_auth.py`) for clone/push/`open_pr`/`request_app_change`; local fallback is `.env`'s `GITHUB_TOKEN`. Created 2026-06-25 (JES-106). |
 
 Invoke with `aws bedrock-agentcore invoke-agent-runtime` (data plane); the
 `runtimeSessionId` must be **≥ 33 chars**. Verified 2026-06-24:
 `{"message": "..."}` → `{"reply": "hi", "status": "chatting"}`.
+
+**GitHub PAT secret** (created 2026-06-25, JES-106). The token value never goes
+through the shell history or chat — pasted into a hidden prompt:
+
+```bash
+read -rs PAT && AWS_PROFILE=sandbox aws secretsmanager create-secret \
+  --region us-west-2 --name trainer-agent/github-pat --secret-string "$PAT"; unset PAT
+```
+
+Read permission is the `GitHubPATSecretRead` statement in
+`scripts/aws/permissions-policy.json` (scoped to `trainer-agent/github-pat-*`),
+applied to the execution role by `scripts/deploy.sh`. Verify the whole path
+(fetch + git wiring, no token printed) with
+`AWS_PROFILE=sandbox uv run --no-sync python scripts/github-auth-smoke.py`.
+Rotate by storing a new PAT version; the agent reads the current version each
+cold start.
 
 ### Teardown
 
@@ -53,6 +70,7 @@ aws bedrock-agentcore-control delete-agent-runtime --region us-west-2 --agent-ru
 aws iam delete-role-policy --role-name trainer-agent-agentcore-runtime --policy-name trainer-agent-runtime-permissions
 aws iam delete-role --role-name trainer-agent-agentcore-runtime
 aws ecr delete-repository --repository-name trainer-agent --region us-west-2 --force
+aws secretsmanager delete-secret --secret-id trainer-agent/github-pat --region us-west-2 --force-delete-without-recovery
 ```
 
 ## Front door — authed Lambda + public Function URL

@@ -1096,6 +1096,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "bedrock-agentcore" },
+    { name = "boto3" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
     { name = "python-dotenv" },
@@ -1105,6 +1106,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "bedrock-agentcore" },
+    { name = "boto3" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
     { name = "python-dotenv" },
