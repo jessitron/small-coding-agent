@@ -66,8 +66,8 @@ class Handler(BaseHTTPRequestHandler):
         if result[0] == "error":
             _, status, body = result
             return self._send(status, body)
-        _, message, _session_id = result
-        self._send(200, canned_reply(message))
+        _, req = result
+        self._send(200, canned_reply(req.get("message", "")))
 
     def do_GET(self):
         if self.path == "/ping":

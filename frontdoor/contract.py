@@ -16,7 +16,7 @@ against). Bump both together; see that doc's Versioning section.
 import hmac
 import json
 
-INTERFACE_VERSION = "1.0"
+INTERFACE_VERSION = "2.0"
 INTERFACE_VERSION_HEADER = "X-Trainer-Agent-Interface-Version"
 
 # AgentCore requires runtimeSessionId >= 33 chars.
@@ -46,12 +46,13 @@ def validate_request(headers, raw_body, expected_bearer):
 
     ``raw_body`` may be ``bytes``, ``str``, or ``None``. Returns one of:
 
-      ``("ok", message, session_id)``         — valid; proceed
+      ``("ok", body)``                        — valid; ``body`` is the parsed dict
       ``("error", status_code, error_body)``  — reject with this status + JSON body
 
-    The caller turns that into its own response shape (Lambda dict vs. HTTP
-    response), but the *decision* lives here so the stub and the real handler
-    agree by construction.
+    On success the whole parsed ``body`` is returned (``message``, ``session_id``,
+    and the v2.0 ``seq`` / ``state``), so the caller forwards the v2.0 fields
+    without the contract needing to know what they mean. The *validation decision*
+    still lives here so the stub and the real handler agree by construction.
     """
     if not bearer_ok(headers, expected_bearer):
         return ("error", 401, {"error": "unauthorized"})
@@ -64,4 +65,4 @@ def validate_request(headers, raw_body, expected_bearer):
     session_id = body.get("session_id")
     if not session_id or len(session_id) < MIN_SESSION_ID_LEN:
         return ("error", 400, {"error": "session_id required (>= 33 chars)"})
-    return ("ok", body.get("message", ""), session_id)
+    return ("ok", body)

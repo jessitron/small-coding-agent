@@ -113,7 +113,9 @@ def lambda_handler(event, context):
     if result[0] == "error":
         _, status, body = result
         return _resp(status, body)
-    _, message, session_id = result
+    _, req = result
+    message = req.get("message", "")
+    session_id = req["session_id"]
 
     # 3. Continue the caller's trace and proxy the call.
     parent_ctx = extract({k.lower(): v for k, v in headers.items()})
@@ -146,6 +148,13 @@ def lambda_handler(event, context):
         carrier = {}
         inject(carrier)
         agent_payload = {"message": message}
+        # Forward the v2.0 fields untouched; the agent owns their meaning (the
+        # seq context-loss check, the opaque app-defined game state).
+        if req.get("seq") is not None:
+            agent_payload["seq"] = req["seq"]
+            span.set_attribute("agent.seq", req["seq"])
+        if req.get("state") is not None:
+            agent_payload["state"] = req["state"]
         if carrier.get("traceparent"):
             agent_payload["traceparent"] = carrier["traceparent"]
         if carrier.get("tracestate"):

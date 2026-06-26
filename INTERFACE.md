@@ -1,6 +1,6 @@
 # Working with the Trainer Agent
 
-> **Interface version: 1.0** — this document IS the spec for that version. The
+> **Interface version: 2.0** — this document IS the spec for that version. The
 > running service advertises the same version on every response
 > (`X-Trainer-Agent-Interface-Version`); this doc and the service are bumped
 > together. See [Versioning](#versioning) and [Changelog](#changelog).
@@ -59,6 +59,29 @@ than failing silently.
 **Boundaries worth knowing:** one target repo, one PR per session,
 request/response only (no streaming). Observability is first-class — the whole
 call path is one trace (see [Trace propagation](#trace-propagation-recommended)).
+
+### What your repo provides: the agent's brief
+
+The Trainer Agent learns **what you want of it** from a file **in your repo**, not
+from this spec. On the first message of a session it clones your repo and reads:
+
+```
+trainer-agent/instructions.md
+```
+
+That file is your standing brief — what the agent should do each turn, your
+conventions, and any helper scripts it should run (put those alongside it in
+`trainer-agent/`, e.g. `trainer-agent/cards.sh`, and point at them from the
+instructions). You own it and change it on your own schedule, in your own PRs — no
+Trainer-Agent deploy required. **If it's missing or empty, the agent returns
+`status: error` rather than guessing.** This is the division of labor: *this* doc
+defines how to **call** the agent and use its tools; **your** `instructions.md`
+defines the **work**.
+
+The agent can also push back on its own inputs: when it needs something it can't
+get (say, the deck's strategy in the request), it may **open a GitHub issue on
+your repo** describing what it needs. Treat those as requests to improve the brief
+or the `state` you send.
 
 ---
 
@@ -157,7 +180,9 @@ rotated.
 ```json
 {
   "message": "the user's chat message",
-  "session_id": "a-stable-id-at-least-33-characters-long"
+  "session_id": "a-stable-id-at-least-33-characters-long",
+  "seq": 1,
+  "state": { "...your app-defined game state..." }
 }
 ```
 
@@ -167,6 +192,17 @@ rotated.
   conversation.** It keeps the agent's microVM warm and its cloned working tree
   intact across turns. A new id = a fresh conversation. Too short / missing →
   `400 {"error":"session_id required (>= 33 chars)"}`.
+- **`seq`** — the **1-based number of this user message in the session** (`1` for
+  the first message, `2` for the second, …). The agent checks it against the turns
+  it has actually handled; a mismatch means the session expired and the game state
+  is gone, so the agent returns `status: error` asking the user to start a new
+  conversation (see [Response](#response)). **Send it** so lost context is caught
+  honestly instead of the agent acting on a deck it can no longer see.
+- **`state`** — the **current game state**, an object **you define**. The agent
+  passes it into its reasoning each turn; its shape is described by *your*
+  `trainer-agent/instructions.md`, not by this spec. Send it fresh each turn — the
+  agent persists only its own conversation, not your game. Omit it only if your
+  `instructions.md` says the agent doesn't need it.
 
 ### Response
 
@@ -183,7 +219,10 @@ rotated.
 - **`reply`** — show this in the chat UI.
 - **`status`** — `chatting`/`asking` (talking or wants info — keep the
   conversation going), `coding` (working), `done` (finished this task),
-  `error` (something failed; `reply` explains).
+  `error` (something failed; `reply` explains). A **lost session** (the `seq`
+  didn't line up, or the microVM expired and the game state is gone) comes back as
+  `error` with a `reply` telling the user to start a new conversation — mint a new
+  `session_id` and reset `seq` to `1`.
 - **`pr_url`** — present only once a PR exists. Link it in the UI.
 
 ### Errors
@@ -217,10 +256,14 @@ No extra body fields are required — the `traceparent` **header** is enough.
 
 ### A minimal chat loop
 
-1. On a new conversation, mint a `session_id` (≥33 chars) and keep it.
-2. For each user message: `POST` with that `session_id`; render `reply`.
+1. On a new conversation, mint a `session_id` (≥33 chars), keep it, and start a
+   `seq` counter at `1`.
+2. For each user message: `POST` with that `session_id`, the current `seq`, and
+   the current `state`; render `reply`; increment `seq` for the next message.
 3. While `status` is `chatting`/`asking`/`coding`, keep letting the user reply.
 4. When `pr_url` appears, surface the PR link. `status: done` ends the task.
+5. On `status: error` for a lost session, start over at step 1 (new `session_id`,
+   `seq` back to `1`).
 
 ### Examples
 
@@ -230,8 +273,8 @@ No extra body fields are required — the `traceparent` **header** is enough.
 curl -sS -XPOST "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/" \
   -H "Authorization: Bearer $TRAINER_AGENT_TOKEN" \
   -H 'Content-Type: application/json' \
-  -H 'X-Trainer-Agent-Interface-Version: 1.0' \
-  -d '{"message":"Add a shuffle-animation toggle to the deck view","session_id":"mtg-deck-shuffler-3f9c1e6a-2b7d-4a55-9e21-abc123def456"}'
+  -H 'X-Trainer-Agent-Interface-Version: 2.0' \
+  -d '{"message":"Add a shuffle-animation toggle to the deck view","session_id":"mtg-deck-shuffler-3f9c1e6a-2b7d-4a55-9e21-abc123def456","seq":1,"state":{"deck_id":"boros-aggro","hand":["Mountain","Boros Charm"]}}'
 ```
 
 #### Python (with OTel propagation)
@@ -242,14 +285,16 @@ from opentelemetry.propagate import inject  # if you use OTel
 
 URL = "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/"
 
-def ask_trainer(message: str, session_id: str) -> dict:
+def ask_trainer(message: str, session_id: str, seq: int, state: dict) -> dict:
     headers = {
         "Authorization": f"Bearer {os.environ['TRAINER_AGENT_TOKEN']}",
         "Content-Type": "application/json",
-        "X-Trainer-Agent-Interface-Version": "1.0",  # the version you built against
+        "X-Trainer-Agent-Interface-Version": "2.0",  # the version you built against
     }
     inject(headers)  # adds W3C `traceparent` so the trace continues into the agent
-    body = json.dumps({"message": message, "session_id": session_id}).encode()
+    body = json.dumps(
+        {"message": message, "session_id": session_id, "seq": seq, "state": state}
+    ).encode()
     req = urllib.request.Request(URL, data=body, headers=headers, method="POST")
     with urllib.request.urlopen(req, timeout=300) as resp:   # long timeout!
         return json.loads(resp.read())
@@ -263,16 +308,16 @@ def ask_trainer(message: str, session_id: str) -> dict:
 ```ts
 const URL = "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/";
 
-async function askTrainer(message: string, sessionId: string) {
+async function askTrainer(message: string, sessionId: string, seq: number, state: object) {
   const res = await fetch(URL, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${process.env.TRAINER_AGENT_TOKEN}`,
       "Content-Type": "application/json",
-      "X-Trainer-Agent-Interface-Version": "1.0", // the version you built against
+      "X-Trainer-Agent-Interface-Version": "2.0", // the version you built against
       // If you use OTel, inject `traceparent` here so the trace continues.
     },
-    body: JSON.stringify({ message, session_id: sessionId }),
+    body: JSON.stringify({ message, session_id: sessionId, seq, state }),
     signal: AbortSignal.timeout(300_000), // long timeout for coding turns
   });
   if (!res.ok) throw new Error(`trainer agent ${res.status}: ${await res.text()}`);
@@ -320,7 +365,7 @@ trainer-agent repo's `frontdoor/`; `latest` tracks the current interface version
 
 ## Versioning
 
-This whole document is versioned `MAJOR.MINOR` (currently **1.0**) — **the version
+This whole document is versioned `MAJOR.MINOR` (currently **2.0**) — **the version
 covers expectations, not just the wire bytes.** A change to what a consumer should
 *expect* — the conceptual framing, the collaboration convention, *or* the
 technical contract — is a version bump. MAJOR when the change could confuse or
@@ -334,7 +379,7 @@ collaboration changes ride the same number so that one version describes one
 coherent set of expectations.)
 
 - **The service advertises its version** on every response:
-  `X-Trainer-Agent-Interface-Version: 1.0`.
+  `X-Trainer-Agent-Interface-Version: 2.0`.
 - **You should declare yours** by sending the same header on each **request**, set
   to the version you built against.
 - **A mismatch is a warning, not an error.** The front door never rejects a
@@ -352,6 +397,19 @@ local edit.
 
 ## Changelog
 
+- **2.0** (2026-06-25) — the agent grew up from the "hi" stub into a real coding
+  agent (the chat→PR loop). Breaking, hence MAJOR:
+  - **Request gains `seq`** (1-based per-message counter) — the agent rejects a
+    mismatched `seq` as a lost session (`status: error`), so expired context is
+    caught honestly instead of acted on.
+  - **Request gains `state`** — your app-defined game state, passed into the
+    agent's reasoning each turn (shape defined by your `trainer-agent/instructions.md`).
+  - **New consumer obligation:** your repo must contain
+    `trainer-agent/instructions.md` (the agent's brief); missing/empty → `error`.
+  - **New:** the agent may open a **GitHub issue on your repo** to request better
+    inputs.
+  - Unchanged: bearer auth, the Function URL, `{reply, status, pr_url?}`,
+    `traceparent` propagation, and the version header.
 - **1.0** (2026-06-25) — initial interface. The conceptual, collaboration, and
   technical interfaces in one spec. Wire contract: `POST` `{message, session_id}` +
   bearer auth over the Function URL; response `{reply, status, pr_url?}`; optional
