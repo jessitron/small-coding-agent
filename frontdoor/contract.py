@@ -18,7 +18,7 @@ Bump both together; see that doc's Versioning section.
 import hmac
 import json
 
-INTERFACE_VERSION = "2.0"
+INTERFACE_VERSION = "2.1"
 INTERFACE_VERSION_HEADER = "X-Trainer-Agent-Interface-Version"
 
 # AgentCore requires runtimeSessionId >= 33 chars.

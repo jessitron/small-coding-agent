@@ -24,7 +24,7 @@ HDRS="$(mktemp)"
 reply="$(curl -fsS -D "$HDRS" -XPOST "$FUNCTION_URL" \
   -H "Authorization: Bearer $BEARER" \
   -H 'Content-Type: application/json' \
-  -H 'X-Trainer-Agent-Interface-Version: 2.0' \
+  -H 'X-Trainer-Agent-Interface-Version: 2.1' \
   -d "{\"message\":\"hello from the frontdoor smoke\",\"session_id\":\"$SESSION_ID\",\"seq\":1,\"state\":{}}")"
 echo "== response: $reply"
 
@@ -36,11 +36,11 @@ else
   echo "FAIL: response not contract-shaped {reply,status}"; exit 1
 fi
 
-# Confirm the front door advertises interface version 2.0.
-if grep -qi '^x-trainer-agent-interface-version: 2.0' "$HDRS"; then
-  echo "PASS (advertises interface 2.0)"
+# Confirm the front door advertises interface version 2.1.
+if grep -qi '^x-trainer-agent-interface-version: 2.1' "$HDRS"; then
+  echo "PASS (advertises interface 2.1)"
 else
-  echo "FAIL: expected version header 2.0"; grep -i interface-version "$HDRS" || true; exit 1
+  echo "FAIL: expected version header 2.1"; grep -i interface-version "$HDRS" || true; exit 1
 fi
 
 # Also confirm auth actually rejects a bad token (should be 401, not 200).

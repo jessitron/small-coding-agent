@@ -1,6 +1,6 @@
 # Working with the Trainer Agent
 
-> **Interface version: 2.0** — this document IS the spec for that version. The
+> **Interface version: 2.1** — this document IS the spec for that version. The
 > running service advertises the same version on every response
 > (`X-Trainer-Agent-Interface-Version`); this doc and the service are bumped
 > together. See [Versioning](#versioning) and [Changelog](#changelog).
@@ -147,7 +147,7 @@ rotated.
 Headers:
 
 `Content-Type: application/json`
-`X-Trainer-Agent-Interface-Version: 2.0`
+`X-Trainer-Agent-Interface-Version: 2.1`
 `traceparent: ...`
 
 Body:
@@ -252,7 +252,7 @@ No extra body fields are required — the `traceparent` **header** is enough.
 curl -sS -XPOST "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/" \
   -H "Authorization: Bearer $TRAINER_AGENT_TOKEN" \
   -H 'Content-Type: application/json' \
-  -H 'X-Trainer-Agent-Interface-Version: 2.0' \
+  -H 'X-Trainer-Agent-Interface-Version: 2.1' \
   -d '{"message":"Add a shuffle-animation toggle to the deck view","session_id":"mtg-deck-shuffler-3f9c1e6a-2b7d-4a55-9e21-abc123def456","seq":1,"state":{"deck_id":"boros-aggro","hand":["Mountain","Boros Charm"]}}'
 ```
 
@@ -341,7 +341,7 @@ docker run -p 8080:8080 -e STUB_BEARER=test-token \
 
 ## Versioning
 
-This whole document is versioned `MAJOR.MINOR` (currently **2.0**) — **the version
+This whole document is versioned `MAJOR.MINOR` (currently **2.1**) — **the version
 covers expectations, not just the wire bytes.** A change to what a consumer should
 _expect_ — the conceptual framing, the collaboration convention, _or_ the
 technical contract — is a version bump. MAJOR when the change could confuse or
@@ -355,7 +355,7 @@ collaboration changes ride the same number so that one version describes one
 coherent set of expectations.)
 
 - **The service advertises its version** on every response:
-  `X-Trainer-Agent-Interface-Version: 2.0`.
+  `X-Trainer-Agent-Interface-Version: 2.1`.
 - **You should declare yours** by sending the same header on each **request**, set
   to the version you built against.
 - **A mismatch is a warning, not an error.** The front door never rejects a
@@ -396,15 +396,22 @@ when you want a capability the new version adds.
 
 ## Changelog
 
+- **2.1** (2026-06-26) — `state` is **first-message-only**. Additive, hence MINOR
+  (a consumer still sending `state` every turn keeps working — the agent just
+  ignores it after the first):
+  - **`state` is expected only on a session's first message** (`seq: 1`), to ground
+    the conversation; the agent works from its server-side conversation after that.
+    Previously the spec said to send it every turn.
+  - **The front door records `agent.state_included`** on its trace span (was `state`
+    sent?), so the first-vs-later pattern is visible in Honeycomb. Still optional and
+    unenforced — the front door never rejects on a missing or present `state`.
 - **2.0** (2026-06-25) — the agent grew up from the "hi" stub into a real coding
   agent (the chat→PR loop). Breaking, hence MAJOR:
   - **Request gains `seq`** (1-based per-message counter) — the agent rejects a
     mismatched `seq` as a lost session (`status: error`), so expired context is
     caught honestly instead of acted on.
-  - **Request gains `state`** — your app-defined game state, sent on the **first**
-    message of a session to ground the conversation (shape defined by your
-    `trainer-agent/instructions.md`). Optional and unenforced at the front door,
-    which records on its span whether `state` was sent.
+  - **Request gains `state`** — your app-defined game state, passed into the
+    agent's reasoning each turn (shape defined by your `trainer-agent/instructions.md`).
   - **New consumer obligation:** your repo must contain
     `trainer-agent/instructions.md` (the agent's brief); missing/empty → `error`.
   - **New:** the agent may open a **GitHub issue on your repo** to request better

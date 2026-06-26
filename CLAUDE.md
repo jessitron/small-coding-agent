@@ -24,11 +24,22 @@ title:"…", description:"…\n\n(- claude from small-coding-agent)"`. Search fo
 first; update it instead of filing a second.
 
 ## Notes for future me
-- `INTERFACE.md` (repo root) — **the canonical interface spec**: the single file
-  consumers copy into their repo. Defines three interfaces — conceptual (what the
-  agent is for), collaboration (request changes via Linear), and technical (the
-  HTTP contract). Source of truth; keep it and the running service versioned in
-  lockstep. Contract changes come in as Linear requests, not local edits.
+- `INTERFACE.md` (repo root) — **the canonical, CLIENT-FACING interface spec**:
+  the single file consumers copy into their repo. Defines three interfaces —
+  conceptual (what the agent is for), collaboration (request changes via Linear),
+  and technical (the HTTP contract). Source of truth; contract changes come in as
+  Linear requests, not local edits.
+  - **VERSION IT ON EVERY CHANGE.** This doc is versioned `MAJOR.MINOR`. *Any* edit
+    to what a consumer should expect (conceptual framing, collaboration convention,
+    or wire contract) is a version bump — MINOR for additive/backward-compatible,
+    MAJOR if it could break someone built against the old version. Bumping means,
+    in lockstep: (1) `INTERFACE_VERSION` in `frontdoor/contract.py`; (2) the doc —
+    header line, request-header examples, the curl example, the "currently" line +
+    advertises line in **Versioning**, and a new **Changelog** entry (dated, with
+    the rationale for MINOR vs MAJOR); (3) the version asserted in
+    `scripts/contract-smoke.py` and grepped in `scripts/frontdoor-smoke.sh`. Then
+    **redeploy both the stub and the front-door Lambda** so the advertised version
+    matches the doc. Never change the contract without bumping the version.
 - `design/architecture.md` — the system design and the invoke contract.
 - `notes/decisions.md` — running log of decisions and *why* (read this first).
 - `notes/infrastructure.md` — everything we touch in AWS (profile `jessitron-sandbox` =

@@ -1,7 +1,7 @@
-"""Offline smoke for the v2.0 wire contract + the seq context-loss check (JES-109).
+"""Offline smoke for the v2.1 wire contract + the seq context-loss check (JES-109).
 
 No AWS, no Bedrock. Covers:
-- frontdoor/contract.py: version is 2.0; success returns the parsed body with
+- frontdoor/contract.py: version is 2.1; success returns the parsed body with
   seq/state preserved; the 401/400 rejections still hold.
 - agent.loop seq check: a seq that doesn't match the session's turn count returns
   an honest status:error (context lost); a matching seq passes the gate and
@@ -27,7 +27,7 @@ SID = "seq-smoke-session-" + "a" * 33
 def test_contract():
     from contract import INTERFACE_VERSION, validate_request
 
-    assert INTERFACE_VERSION == "2.0", INTERFACE_VERSION
+    assert INTERFACE_VERSION == "2.1", INTERFACE_VERSION
     hdrs = {"Authorization": "Bearer t"}
 
     body = json.dumps(
@@ -41,7 +41,7 @@ def test_contract():
     assert validate_request({}, "{}", "t")[1] == 401  # no/!bearer
     assert validate_request(hdrs, "{not json", "t")[1] == 400  # bad json
     assert validate_request(hdrs, json.dumps({"session_id": "short"}), "t")[1] == 400
-    print("contract (v2.0, seq/state passthrough, rejections): OK")
+    print("contract (v2.1, seq/state passthrough, rejections): OK")
 
 
 def _make_bare_repo(path: Path):
