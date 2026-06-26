@@ -52,6 +52,16 @@ runtime (idempotent); `scripts/cloud-smoke.sh` invokes the deployed runtime.
 `AWS_DEFAULT_REGION` (this machine is us-east-1). All AWS resources are recorded
 in `notes/infrastructure.md`.
 
+## The test fake / stub (`frontdoor/stub.py`)
+The "test fake" mtg-deck-shuffler runs as a sidecar. It enforces the real request
+contract (`frontdoor/contract.py`, shared) but returns canned replies — no AWS, no
+real agent, no PR. Canned `status` is driven by the message text (see the module
+docstring). **It is deliberately zero-dependency (stdlib only) and emits NO OTel
+tracing** — no spans, no "I'm faking" signal beyond the `[stub] …` reply strings and
+`{"stub": true}` on `/ping`. Adding OTel would trade away the zero-dep property that
+lets the app `docker run` it with nothing to install; if we instrument it, prefer a
+soft/optional import that no-ops when no collector is configured.
+
 ## Telemetry (see `notes/telemetry.md`)
 Traces go through **Boswell** (the OTel collector in the neighboring cyndibot
 repo) to Honeycomb **team `modernity`** — local→env `local`, prod→env
