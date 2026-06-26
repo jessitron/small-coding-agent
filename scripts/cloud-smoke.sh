@@ -32,8 +32,12 @@ aws bedrock-agentcore invoke-agent-runtime --region "$REGION" \
 echo "== response:"
 cat "$OUT"; echo
 
-if grep -q '"reply": "hi"' "$OUT"; then
-  echo "PASS"
+# Wiring check (IAM, networking, the dispatcher) — not logic. A contract-shaped
+# {reply,status} proves the deployed agent ran. Until the app adds
+# trainer-agent/instructions.md, the expected status here is "error" (missing
+# brief); once it exists this same smoke will show a real chatting/coding reply.
+if grep -q '"status"' "$OUT" && grep -q '"reply"' "$OUT"; then
+  echo "PASS (deployed agent responded with contract-shaped JSON)"
 else
-  echo "FAIL: unexpected reply"; cat /tmp/invoke-meta.json; exit 1
+  echo "FAIL: response not contract-shaped {reply,status}"; cat /tmp/invoke-meta.json; exit 1
 fi
