@@ -7,10 +7,12 @@ stub enforces *exactly* what production enforces, so a green test against the st
 means something. If the rules lived in two places they would drift and the stub
 would start lying.
 
-Pure stdlib — no AWS, no OpenTelemetry — so the stub stays zero-dependency.
+Pure stdlib — no AWS, no OpenTelemetry — so it can be imported by the real Lambda
+handler unchanged. (The stub itself is no longer zero-dependency: it adds OTel to
+emit its own spans — see ``frontdoor/stub.py``. This module stays stdlib-only.)
 
-Versioned with ``notes/frontdoor-integration.md`` (the spec the app integrates
-against). Bump both together; see that doc's Versioning section.
+Versioned with ``INTERFACE.md`` (the canonical spec the app integrates against).
+Bump both together; see that doc's Versioning section.
 """
 
 import hmac
