@@ -52,6 +52,18 @@ runtime (idempotent); `scripts/cloud-smoke.sh` invokes the deployed runtime.
 `AWS_DEFAULT_REGION` (this machine is us-east-1). All AWS resources are recorded
 in `notes/infrastructure.md`.
 
+**Deploy is part of the task — don't ask, just ship (pre-authorized).** The
+running service IS the deliverable; an undeployed change is inert. So a change
+isn't done until it's live:
+- **stub change** (`frontdoor/`) → commit → `AWS_PROFILE=sandbox scripts/publish-stub.sh`
+  (sandbox ECR, so mtg-deck-shuffler's next pull gets it).
+- **agent change** (`src/agent/`, deps, Dockerfile) → commit → `scripts/deploy.sh`
+  → `scripts/cloud-smoke.sh` to confirm the deployed runtime answers.
+Run the relevant smoke (`stub-smoke.sh` / `cloud-smoke.sh`) after, and report the
+landed result. Both deploys are pre-authorized — treat them like commits, not
+like outward-facing actions to confirm first. (Publishing/deploying needs network
+the sandbox lacks — run those commands with the sandbox disabled.)
+
 ## The test fake / stub (`frontdoor/stub.py`)
 The "test fake" mtg-deck-shuffler runs as a sidecar. It enforces the real request
 contract (`frontdoor/contract.py`, shared) but returns canned replies — no AWS, no
