@@ -58,4 +58,24 @@ curl -s -XPOST "$URL" -H "Authorization: Bearer $BEARER" -H 'Content-Type: appli
 grep -q '"status": "done"' /tmp/stub-body || fail "expected done; got $(cat /tmp/stub-body)"
 grep -q '"pr_url"' /tmp/stub-body || fail "expected pr_url; got $(cat /tmp/stub-body)"
 
+# Lost-session simulation (v2.0 seq): a fresh session expects seq 1; a gap is a
+# lost session -> error, exactly like the real agent. Use a fresh session_id so
+# the counter starts at 0.
+SID2="stub-smoke-seq-session-0002-needs-to-be-33-plus-chars"
+echo "== seq=1 on a fresh session -> 200 chatting"
+curl -s -XPOST "$URL" -H "Authorization: Bearer $BEARER" -H 'Content-Type: application/json' \
+  -d "{\"message\":\"hello\",\"session_id\":\"$SID2\",\"seq\":1}" >/tmp/stub-body
+grep -q '"status": "chatting"' /tmp/stub-body || fail "expected chatting; got $(cat /tmp/stub-body)"
+
+echo "== seq=3 (gap) -> error, lost context"
+curl -s -XPOST "$URL" -H "Authorization: Bearer $BEARER" -H 'Content-Type: application/json' \
+  -d "{\"message\":\"hello\",\"session_id\":\"$SID2\",\"seq\":3}" >/tmp/stub-body
+grep -q '"status": "error"' /tmp/stub-body || fail "expected error; got $(cat /tmp/stub-body)"
+grep -qi 'lost the context' /tmp/stub-body || fail "expected lost-context reply; got $(cat /tmp/stub-body)"
+
+echo "== seq=2 (correct next, counter didn't advance on the error) -> 200 chatting"
+curl -s -XPOST "$URL" -H "Authorization: Bearer $BEARER" -H 'Content-Type: application/json' \
+  -d "{\"message\":\"hello\",\"session_id\":\"$SID2\",\"seq\":2}" >/tmp/stub-body
+grep -q '"status": "chatting"' /tmp/stub-body || fail "expected chatting; got $(cat /tmp/stub-body)"
+
 echo "PASS"

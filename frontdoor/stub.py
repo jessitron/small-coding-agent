@@ -15,6 +15,15 @@ branch of its UI:
   - "error" / "fail"             -> status "error"
   - otherwise                    -> status "chatting"
 
+It also faithfully simulates the v2.0 **lost-session** path: like the real agent
+(``src/agent/loop.py``), the stub tracks how many turns each ``session_id`` has
+completed and expects the next ``seq`` to be ``turns_seen + 1``. A mismatched
+``seq`` returns ``status: "error"`` with the same "lost the context" reply prod
+uses — so the app can exercise that branch without forcing it via message text.
+The counter advances only on a successful (non-error) turn, so a retry with the
+same ``seq`` still lines up. (In-memory, per process — a fresh container starts
+every session at 0, exactly like a fresh microVM.)
+
 Observability: the stub is instrumented with OpenTelemetry. Each request emits a
 ``frontdoor-stub.invocation`` span carrying ``stub.faking=true`` (so it is
 unmistakable in Honeycomb that this is the fake, not the real agent). It joins the
@@ -31,6 +40,7 @@ Env:   ``PORT`` (default 8080); ``STUB_BEARER`` — the token the app must prese
 
 import json
 import os
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from opentelemetry import trace
@@ -88,6 +98,44 @@ def canned_reply(message):
     return {"reply": "[stub] hi", "status": "chatting"}
 
 
+# Per-session turn counter, mirroring the real agent's on-disk counter
+# (src/agent/loop.py). In memory: a fresh container starts every session at 0,
+# exactly like a fresh microVM. ThreadingHTTPServer handles requests on threads,
+# so guard it with a lock.
+_turns_seen = {}
+_turns_lock = threading.Lock()
+
+
+def stub_reply(session_id, seq, message):
+    """Produce the stub's response, simulating the real agent's lost-session check.
+
+    Returns ``(reply, context_lost)``. ``context_lost`` is True when ``seq`` didn't
+    match the expected next turn (so the caller can mark the span like prod does).
+    """
+    with _turns_lock:
+        turns_seen = _turns_seen.get(session_id, 0)
+        expected = turns_seen + 1
+        # Context-loss check — only when the client declares a seq (mirrors
+        # src/agent/loop.py run_turn). A mismatch means the session was lost.
+        if seq is not None and seq != expected:
+            return (
+                {
+                    "reply": (
+                        "I've lost the context for this conversation — I expected message "
+                        f"#{expected} but received #{seq}, which means the session "
+                        "expired and the game state is gone. Please start a new conversation."
+                    ),
+                    "status": "error",
+                },
+                True,
+            )
+        reply = canned_reply(message)
+        # Advance only on a successful turn, so a retry with the same seq lines up.
+        if reply["status"] != "error":
+            _turns_seen[session_id] = expected
+        return reply, False
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, status, body):
         payload = json.dumps(body).encode()
@@ -128,9 +176,16 @@ class Handler(BaseHTTPRequestHandler):
 
             _, req = result
             message = req.get("message", "")
+            seq = req.get("seq")
+            session_id = req.get("session_id")
             span.set_attribute("agent.message", message)
 
-            reply = canned_reply(message)
+            reply, context_lost = stub_reply(session_id, seq, message)
+            if context_lost:
+                # Same span signal the real agent emits on a lost session.
+                span.set_attribute("agent.context_lost", True)
+                span.set_attribute("agent.seq_received", seq)
+                span.set_attribute("agent.seq_expected", _turns_seen.get(session_id, 0) + 1)
             span.set_attribute("agent.status", reply["status"])
             span.set_attribute("agent.reply", reply["reply"])
             if reply.get("pr_url"):
