@@ -4,9 +4,11 @@ The Trainer Agent trains ``jessitron/mtg-deck-shuffler`` to give better in-game
 recommendations: it chats with a human (through another app, over synchronous
 HTTP), implements a coding task on a branch, and opens a PR.
 
-This module is the minimal scaffold. It stands up the AgentCore harness and
-replies "hi", proving the deploy pipe end to end. The Strands agent loop, GitHub
-tools, and observability arrive in later landings (see TODO.md).
+Each invoke is one chat turn: clone the repo (first turn) and load the app's
+brief (``agent.workspace``), then run one Strands turn (``agent.loop``) that
+reasons over the brief + the user's message + the game state and replies. The
+agent loop, tools, and session persistence live in ``agent.loop``; this module
+is the AgentCore harness + trace plumbing.
 
 Run locally::
 
@@ -16,18 +18,27 @@ then in another shell::
 
     curl -XPOST http://localhost:8080/invocations \
         -H 'Content-Type: application/json' \
-        -d '{"message": "hello"}'
+        -d '{"message": "hello", "session_id": "...>=33 chars..."}'
 
 AgentCore serves the entrypoint at ``POST /invocations`` on port 8080, with a
 health check at ``GET /ping``.
 """
 
-from bedrock_agentcore import BedrockAgentCoreApp
-from dotenv import load_dotenv
-from opentelemetry import trace
-from opentelemetry.propagate import extract
+import os
 
-from agent.observability import configure_tracing, flush
+# Opt into GenAI semantic conventions + message-content capture BEFORE strands is
+# imported (via agent.loop), so model spans carry raw LLM I/O. Overridable by the
+# environment; see design/architecture.md §Observability.
+os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", "gen_ai_latest_experimental")
+os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "true")
+
+from bedrock_agentcore import BedrockAgentCoreApp  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+from opentelemetry import trace  # noqa: E402
+from opentelemetry.propagate import extract  # noqa: E402
+
+from agent.loop import run_turn  # noqa: E402
+from agent.observability import configure_tracing, flush  # noqa: E402
 
 # Load local .env (OTEL_* etc.) before configuring tracing. In prod there is no
 # .env in the image; the AgentCore runtime supplies the env vars and this no-ops.
@@ -78,9 +89,15 @@ def invoke(payload, context=None):
         if session_id:
             span.set_attribute("session.id", session_id)
         span.set_attribute("agent.message", message)
-        reply = {"reply": "hi", "status": "chatting"}
-        span.set_attribute("agent.reply", reply["reply"])
+
+        reply = run_turn(payload, session_id)
+
         span.set_attribute("agent.status", reply["status"])
+        span.set_attribute("agent.reply", reply["reply"])
+        if reply.get("pr_url"):
+            span.set_attribute("pr.url", reply["pr_url"])
+        if reply["status"] == "error":
+            span.set_status(trace.Status(trace.StatusCode.ERROR, reply["reply"]))
 
     flush()
     return reply

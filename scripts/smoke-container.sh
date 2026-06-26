@@ -34,13 +34,16 @@ done
 echo "==> GET /ping"
 curl -fsS "http://localhost:$PORT/ping"; echo
 
-echo "==> POST /invocations  {\"message\":\"hello\"}"
+# No session_id -> honest status:error; this checks the packaged HTTP surface
+# (entrypoint, arch, imports incl. strands + git, contract-shaped JSON) without
+# needing Bedrock. The real model loop is verified by the cloud smoke.
+echo "==> POST /invocations  {\"message\":\"hello\"}  (no session_id -> honest error)"
 reply=$(curl -fsS -XPOST "http://localhost:$PORT/invocations" \
   -H 'Content-Type: application/json' -d '{"message":"hello"}')
 echo "$reply"
 
-if echo "$reply" | grep -q '"reply": "hi"'; then
+if echo "$reply" | grep -q '"status"' && echo "$reply" | grep -q '"reply"'; then
   echo "PASS"
 else
-  echo "FAIL: unexpected reply"; docker logs "$NAME"; exit 1
+  echo "FAIL: response not contract-shaped {reply,status}"; docker logs "$NAME"; exit 1
 fi

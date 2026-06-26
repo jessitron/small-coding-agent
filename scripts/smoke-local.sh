@@ -20,13 +20,18 @@ done
 echo "==> GET /ping"
 curl -fsS "http://localhost:$PORT/ping"; echo
 
-echo "==> POST /invocations  {\"message\":\"hello\"}"
+# No session_id here, so the agent can't set up a workspace and returns an honest
+# status:error — which is exactly what this layer checks: the HTTP surface is up,
+# imports load, and the entrypoint returns contract-shaped JSON {reply,status}
+# WITHOUT needing Bedrock. The real model loop is verified by scripts/loop-smoke.py
+# (Bedrock-backed) and the cloud smoke.
+echo "==> POST /invocations  {\"message\":\"hello\"}  (no session_id -> honest error)"
 reply=$(curl -fsS -XPOST "http://localhost:$PORT/invocations" \
   -H 'Content-Type: application/json' -d '{"message":"hello"}')
 echo "$reply"
 
-if echo "$reply" | grep -q '"reply": "hi"'; then
+if echo "$reply" | grep -q '"status"' && echo "$reply" | grep -q '"reply"'; then
   echo "PASS"
 else
-  echo "FAIL: unexpected reply"; exit 1
+  echo "FAIL: response not contract-shaped {reply,status}"; exit 1
 fi
