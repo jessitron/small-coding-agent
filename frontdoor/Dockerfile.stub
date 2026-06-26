@@ -1,9 +1,11 @@
 # Local test stub for the Trainer Agent front door.
-# Zero pip dependencies — stdlib only — so the image is tiny and fast.
+# Stdlib + OpenTelemetry (the stub emits its own traces — see stub.py).
 # Build context is the frontdoor/ directory:
 #   docker build -f frontdoor/Dockerfile.stub -t trainer-agent-frontdoor-stub frontdoor
 FROM python:3.13-slim
 WORKDIR /app
+COPY requirements-stub.txt ./
+RUN pip install --no-cache-dir -r requirements-stub.txt
 COPY contract.py stub.py ./
 ENV PORT=8080
 EXPOSE 8080

@@ -1,0 +1,4 @@
+# Runtime deps for the front-door test stub (frontdoor/stub.py).
+# OTel only — the stub emits its own traces; everything else is stdlib.
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http

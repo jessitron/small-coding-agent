@@ -56,11 +56,16 @@ in `notes/infrastructure.md`.
 The "test fake" mtg-deck-shuffler runs as a sidecar. It enforces the real request
 contract (`frontdoor/contract.py`, shared) but returns canned replies — no AWS, no
 real agent, no PR. Canned `status` is driven by the message text (see the module
-docstring). **It is deliberately zero-dependency (stdlib only) and emits NO OTel
-tracing** — no spans, no "I'm faking" signal beyond the `[stub] …` reply strings and
-`{"stub": true}` on `/ping`. Adding OTel would trade away the zero-dep property that
-lets the app `docker run` it with nothing to install; if we instrument it, prefer a
-soft/optional import that no-ops when no collector is configured.
+docstring). **It IS instrumented with OpenTelemetry** (deps: `opentelemetry-sdk`,
+`opentelemetry-exporter-otlp-proto-http`, in `frontdoor/requirements-stub.txt`).
+Each request emits a `frontdoor-stub.invocation` span carrying **`stub.faking=true`**
+(so it's unmistakable in Honeycomb that this is the fake), plus `agent.message`,
+`agent.status`, `agent.reply`, `pr.url`, and a "faking the trainer agent…" span event.
+It joins the caller's W3C trace from the request headers, mirroring the real front
+door. Export uses standard `OTEL_*` env vars; **no endpoint configured → no-op tracer**,
+so it still runs (and `scripts/stub-smoke.sh` passes) without a collector. Service
+name defaults to `trainer-agent-frontdoor-stub` (→ its own Honeycomb dataset).
+Verify span emission against the local collector with `scripts/stub-trace-smoke.sh`.
 
 ## Telemetry (see `notes/telemetry.md`)
 Traces go through **Boswell** (the OTel collector in the neighboring cyndibot
