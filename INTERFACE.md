@@ -166,11 +166,14 @@ Body:
   is gone, so the agent returns `status: error` asking the user to start a new
   conversation (see [Response](#response)). **Send it** so lost context is caught
   honestly instead of the agent acting on a deck it can no longer see.
-- **`state`** — the **current game state**, an object **you define**. The agent
-  passes it into its reasoning each turn; its shape is described by _your_
-  `trainer-agent/instructions.md`, not by this spec. Send it fresh each turn — the
-  agent persists only its own conversation, not your game. Omit it only if your
-  `instructions.md` says the agent doesn't need it.
+- **`state`** — the **game state**, an object **you define**. **Send it on the
+  first message of a session** (`seq: 1`); the agent reads it once to ground the
+  conversation and **doesn't expect it on later turns** — it works from its own
+  server-side conversation after that. Its shape is described by _your_
+  `trainer-agent/instructions.md`, not by this spec. The front door treats `state`
+  as optional: it never rejects on a missing or present `state`, forwards it
+  untouched, and records on its trace span whether `state` was sent. Omit it on the
+  first message only if your `instructions.md` says the agent doesn't need it.
 
 ### Response
 
@@ -226,8 +229,9 @@ No extra body fields are required — the `traceparent` **header** is enough.
 
 1. On a new conversation, mint a `session_id` (≥33 chars), keep it, and start a
    `seq` counter at `1`.
-2. For each user message: `POST` with that `session_id`, the current `seq`, and
-   the current `state`; render `reply`; increment `seq` for the next message.
+2. On the **first** message, `POST` with that `session_id`, `seq: 1`, and your
+   `state`. For each **later** message, `POST` with the `session_id` and the
+   incremented `seq` — no `state` needed. Render `reply` each turn.
 3. While `status` is `chatting`/`asking`/`coding`, keep letting the user reply.
 4. When `pr_url` appears, surface the PR link. `status: done` ends the task.
 5. On `status: error` for a lost session, start over at step 1 (new `session_id`,
@@ -279,7 +283,7 @@ Now hit `http://localhost:8080/` exactly as you would the real endpoint, using
 The stub is **OpenTelemetry-instrumented**, just like the real front door: each
 request emits a `frontdoor-stub.invocation` span carrying `stub.faking=true` (so
 it's unmistakable in Honeycomb that this is the fake, not the real agent), plus
-`agent.message`/`agent.status`/`agent.reply`/`pr.url`, and it **joins your trace**
+`agent.message`/`agent.status`/`agent.reply`/`pr.url`/`agent.state_included`, and it **joins your trace**
 via the `traceparent` header — so your app, the stub, and your handling of the
 reply land in one trace, mirroring the prod call path.
 
@@ -367,8 +371,10 @@ local edit.
   - **Request gains `seq`** (1-based per-message counter) — the agent rejects a
     mismatched `seq` as a lost session (`status: error`), so expired context is
     caught honestly instead of acted on.
-  - **Request gains `state`** — your app-defined game state, passed into the
-    agent's reasoning each turn (shape defined by your `trainer-agent/instructions.md`).
+  - **Request gains `state`** — your app-defined game state, sent on the **first**
+    message of a session to ground the conversation (shape defined by your
+    `trainer-agent/instructions.md`). Optional and unenforced at the front door,
+    which records on its span whether `state` was sent.
   - **New consumer obligation:** your repo must contain
     `trainer-agent/instructions.md` (the agent's brief); missing/empty → `error`.
   - **New:** the agent may open a **GitHub issue on your repo** to request better

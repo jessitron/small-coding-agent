@@ -179,6 +179,9 @@ class Handler(BaseHTTPRequestHandler):
             seq = req.get("seq")
             session_id = req.get("session_id")
             span.set_attribute("agent.message", message)
+            # `state` is expected only on the first message; treat it as optional
+            # and just record whether it was sent (mirrors the real front door).
+            span.set_attribute("agent.state_included", req.get("state") is not None)
 
             reply, context_lost = stub_reply(session_id, seq, message)
             if context_lost:

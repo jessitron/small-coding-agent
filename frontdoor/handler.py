@@ -153,7 +153,13 @@ def lambda_handler(event, context):
         if req.get("seq") is not None:
             agent_payload["seq"] = req["seq"]
             span.set_attribute("agent.seq", req["seq"])
-        if req.get("state") is not None:
+        # `state` is expected only on the first message of a session; we don't
+        # enforce that (just forward it untouched when present) but we DO record
+        # whether the client sent it, so the first-vs-later pattern is visible
+        # in telemetry.
+        state_included = req.get("state") is not None
+        span.set_attribute("agent.state_included", state_included)
+        if state_included:
             agent_payload["state"] = req["state"]
         if carrier.get("traceparent"):
             agent_payload["traceparent"] = carrier["traceparent"]

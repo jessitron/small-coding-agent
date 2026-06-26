@@ -72,7 +72,8 @@ docstring). **It IS instrumented with OpenTelemetry** (deps: `opentelemetry-sdk`
 `opentelemetry-exporter-otlp-proto-http`, in `frontdoor/requirements-stub.txt`).
 Each request emits a `frontdoor-stub.invocation` span carrying **`stub.faking=true`**
 (so it's unmistakable in Honeycomb that this is the fake), plus `agent.message`,
-`agent.status`, `agent.reply`, `pr.url`, and a "faking the trainer agent…" span event.
+`agent.status`, `agent.reply`, `pr.url`, `agent.state_included` (was `state` sent?
+expected only on a session's first message), and a "faking the trainer agent…" span event.
 It joins the caller's W3C trace from the request headers, mirroring the real front
 door. Export uses standard `OTEL_*` env vars; **no endpoint configured → no-op tracer**,
 so it still runs (and `scripts/stub-smoke.sh` passes) without a collector. Service
