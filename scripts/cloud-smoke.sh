@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Layer 5 cloud smoke (see notes/local-testing-advice.md): invoke the DEPLOYED
-# AgentCore runtime end-to-end. Confirms wiring (IAM, networking, the dispatcher
-# in front of the agent) — not logic, which we prove locally. Fails loud.
+# Layer 5a cloud smoke (see notes/local-testing-advice.md): invoke the deployed
+# AgentCore runtime DIRECTLY (data-plane invoke-agent-runtime), bypassing the
+# front-door Lambda. This isolates the runtime — IAM exec role, image, Bedrock,
+# secret fetch, clone. For the real app path THROUGH the Lambda, use
+# scripts/frontdoor-smoke.sh (L5b). Confirms wiring, not logic. Fails loud.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

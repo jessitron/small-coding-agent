@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Smoke the DEPLOYED front door: POST to the Function URL with the bearer token
-# and assert the agent's reply comes back. Confirms auth + the Lambda->AgentCore
-# proxy wiring end to end. Fails loud.
+# Layer 5b cloud smoke (see notes/local-testing-advice.md): the REAL app path —
+# POST the Function URL with the bearer, THROUGH the front-door Lambda to the
+# runtime. This is the canonical end-to-end "does it work". Also checks what only
+# the front door can break: bearer auth (200 vs 401) and the interface-version
+# header. To isolate the runtime alone, use scripts/cloud-smoke.sh (L5a). Fails loud.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

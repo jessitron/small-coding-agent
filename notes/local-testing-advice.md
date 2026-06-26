@@ -74,10 +74,25 @@ Two payoffs:
 
 ## Layer 5 — Cloud smoke (the thin top)
 
-Keep exactly one script that invokes the deployed runtime end-to-end, for after a
-deploy. It confirms wiring (IAM, networking, the dispatcher in front of the agent) —
-_not_ logic, which you already proved below. If a logic bug reaches this layer,
-that's a signal you were missing a test one layer down; add it there.
+After a deploy, smoke the deployed wiring (IAM, networking, the proxy) — _not_
+logic, which you already proved below. If a logic bug reaches this layer, that's a
+signal you were missing a test one layer down; add it there.
+
+We deploy **two** components (the AgentCore runtime and the front-door Lambda), so
+the top splits in two — keep both, because they localize a failure to one piece:
+
+- **L5a — runtime alone** (`scripts/cloud-smoke.sh`): a direct data-plane
+  `invoke-agent-runtime`, **bypassing the Lambda**. Answers "is the agent/runtime
+  itself wired up?" — IAM exec role, image, Bedrock, secret fetch, clone.
+- **L5b — the real app path** (`scripts/frontdoor-smoke.sh`): POST the **Function
+  URL** with the bearer, **through the Lambda** to the runtime. This is the path
+  the app actually uses, so it's the canonical "does it work" smoke; it also checks
+  what only the front door can break — bearer auth (200 vs 401) and the
+  `X-Trainer-Agent-Interface-Version` header.
+
+Run L5b as the headline end-to-end; reach for L5a to decide _which_ component broke
+when L5b is red. Both assert a contract-shaped `{reply, status}` rather than any
+specific text, so they survive the agent's replies changing.
 
 ## Working habits that make this pay off
 
