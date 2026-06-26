@@ -4,6 +4,13 @@
 > running service advertises the same version on every response
 > (`X-Trainer-Agent-Interface-Version`); this doc and the service are bumped
 > together. See [Versioning](#versioning) and [Changelog](#changelog).
+>
+> **Canonical source:**
+> <https://github.com/jessitron/small-coding-agent/blob/main/INTERFACE.md>.
+> If you're reading a copy in another repo, **that copy is a read-only snapshot** —
+> don't edit it to change the contract. The contract lives at the canonical source;
+> change it via a [development request](#requesting-development-the-collaboration-interface),
+> then [upgrade your copy](#upgrading-your-copy).
 
 **This is the single file you copy into another repo to learn how to work with
 the Trainer Agent.** It defines three interfaces at once:
@@ -358,11 +365,34 @@ coherent set of expectations.)
   at runtime. Sending the header is how you make that signal useful — if you omit
   it, the client version logs as `unset`.
 
-**Consumers pin by copying this doc.** Copy `INTERFACE.md` into your repo; its git
+**Consumers pin by copying this doc.** Copy `INTERFACE.md` into your repo from the
+**canonical source**
+(<https://github.com/jessitron/small-coding-agent/blob/main/INTERFACE.md>); its git
 history then records the version you integrate against, and the spec travels with
-you. When you want the contract to change, that's a
+you. Your copy is a **read-only snapshot** — don't edit it to change the contract.
+When you want the contract to change, that's a
 [development request](#requesting-development-the-collaboration-interface), not a
 local edit.
+
+### Upgrading your copy
+
+The service may move ahead of the version you copied. To upgrade:
+
+1. **Compare** the canonical `INTERFACE.md` against your copy (read the
+   [Changelog](#changelog) to see what moved between your version and the current
+   one). The canonical version is the one at the top of the doc at the link above.
+2. **Re-copy** the whole file over your snapshot — don't hand-merge. The doc is the
+   unit of versioning; a partial copy leaves you on an inconsistent version.
+3. **Update what you send:** set the
+   `X-Trainer-Agent-Interface-Version` request header to the new version, and adopt
+   any new request fields or consumer obligations the Changelog calls out (e.g.
+   `seq`, `state`, `trainer-agent/instructions.md` for 2.0).
+4. **Commit the upgraded copy** so your repo's git history records the new pinned
+   version.
+
+You don't have to upgrade in lockstep — [version mismatch is a warning, not an
+error](#versioning), surfaced in Honeycomb rather than rejected at runtime. Upgrade
+when you want a capability the new version adds.
 
 ## Changelog
 
