@@ -12,6 +12,13 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /app
 
+# git: the agent clones jessitron/mtg-deck-shuffler per session and pushes
+# branches (gh, for PRs/issues, is added when those tools land). One apt layer,
+# cached unless this line changes.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
