@@ -54,15 +54,20 @@ in `notes/infrastructure.md`.
 
 **Deploy is part of the task — don't ask, just ship (pre-authorized).** The
 running service IS the deliverable; an undeployed change is inert. So a change
-isn't done until it's live:
-- **stub change** (`frontdoor/`) → commit → `AWS_PROFILE=sandbox scripts/publish-stub.sh`
-  (sandbox ECR, so mtg-deck-shuffler's next pull gets it).
+isn't done until it's live. Match the deploy to what changed:
+- **stub change** (`frontdoor/stub.py`) → commit → `AWS_PROFILE=sandbox scripts/publish-stub.sh`
+  → `scripts/stub-smoke.sh` (sandbox ECR, so mtg-deck-shuffler's next pull gets it).
+- **front-door Lambda change** (`frontdoor/handler.py`, `frontdoor/contract.py`, deps)
+  → commit → `scripts/deploy-frontdoor.sh` → `scripts/frontdoor-smoke.sh`.
 - **agent change** (`src/agent/`, deps, Dockerfile) → commit → `scripts/deploy.sh`
   → `scripts/cloud-smoke.sh` to confirm the deployed runtime answers.
-Run the relevant smoke (`stub-smoke.sh` / `cloud-smoke.sh`) after, and report the
-landed result. Both deploys are pre-authorized — treat them like commits, not
-like outward-facing actions to confirm first. (Publishing/deploying needs network
-the sandbox lacks — run those commands with the sandbox disabled.)
+- a shared file (`frontdoor/contract.py`) touches **both** the stub and the Lambda —
+  deploy both.
+Run the relevant smoke after, and report the landed result. **All three deploys
+are pre-authorized — this whole system is used only by Jess, so a failed deploy
+breaks nobody else.** Treat them like commits, not like outward-facing actions to
+confirm first; deploy whenever a change needs it. (Publishing/deploying needs
+network the sandbox lacks — run those commands with the sandbox disabled.)
 
 ## The test fake / stub (`frontdoor/stub.py`)
 The "test fake" mtg-deck-shuffler runs as a sidecar. It enforces the real request
