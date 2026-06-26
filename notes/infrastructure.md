@@ -138,7 +138,8 @@ aws secretsmanager delete-secret --secret-id trainer-agent/frontdoor-bearer --re
 
 A validating stand-in for the front door, for mtg-deck-shuffler's local/CI testing.
 Published by **`scripts/publish-stub.sh`**; built from `frontdoor/Dockerfile.stub`
-(stdlib-only `frontdoor/stub.py` + the shared `frontdoor/contract.py`). Enforces the
+(`frontdoor/stub.py` + the shared `frontdoor/contract.py`; OTel-instrumented — deps in
+`frontdoor/requirements-stub.txt`, no-op tracer when no `OTEL_*` configured). Enforces the
 same request contract as prod, returns canned replies. Usage doc:
 [`INTERFACE.md`](../INTERFACE.md) §"Local testing — the stub".
 
