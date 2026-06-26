@@ -100,6 +100,18 @@ def ensure_clone(session_id: str) -> Path:
             detail = (exc.stderr or "").strip()[:500]
             raise WorkspaceError(f"git clone failed: {detail}") from exc
         span.set_attribute("workspace.dir", str(repo_dir))
+
+    # Local commit identity for open_pr's commits (kept out of global config).
+    for k, v in (
+        ("user.name", "Trainer Agent"),
+        ("user.email", "trainer-agent@users.noreply.github.com"),
+    ):
+        subprocess.run(
+            ["git", "config", k, v],
+            cwd=str(repo_dir),
+            check=False,
+            capture_output=True,
+        )
     return repo_dir
 
 

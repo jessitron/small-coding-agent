@@ -19,7 +19,7 @@ from opentelemetry import trace
 from strands import Agent
 from strands.session import FileSessionManager
 
-from agent.tools import make_workspace_tools
+from agent.tools import make_workspace_tools, pr_marker_path
 from agent.workspace import (
     WorkspaceError,
     ensure_clone,
@@ -88,7 +88,7 @@ def _build_agent(session_id: str, repo_dir, instructions: str) -> Agent:
     kwargs = dict(
         agent_id=AGENT_ID,
         system_prompt=_system_prompt(instructions),
-        tools=make_workspace_tools(repo_dir),
+        tools=make_workspace_tools(repo_dir, session_id),
         session_manager=session_manager,
     )
     model_id = os.environ.get("TRAINER_MODEL_ID")
@@ -159,4 +159,9 @@ def run_turn(payload, session_id) -> dict:
         }
 
     _record_turn(session_id, turns_seen)
+
+    # If the agent opened (or updated) a PR this session, report it.
+    pr_file = pr_marker_path(session_id)
+    if pr_file.is_file():
+        return {"reply": str(result), "status": "done", "pr_url": pr_file.read_text().strip()}
     return {"reply": str(result), "status": "chatting"}
