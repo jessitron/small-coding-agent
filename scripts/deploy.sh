@@ -73,15 +73,20 @@ echo "== role arn: $ROLE_ARN"
 BOSWELL_TRACES_URL="https://45exz5ki5veyvldhaojdynf3ty0pqnno.lambda-url.us-west-2.on.aws/v1/traces"
 BOSWELL_TOKEN="$(aws lambda get-function-configuration --function-name boswell --region "$REGION" \
   --query 'Environment.Variables.INGEST_BEARER_TOKEN' --output text 2>/dev/null || echo '')"
-ENV_ARGS=()
+# Always-on agent env: the pinned Bedrock model and raw-LLM-I/O capture on spans.
+# (main.py also defaults the two GenAI vars, but pin them here so prod is explicit.)
+MODEL_ID="${TRAINER_MODEL_ID:-us.anthropic.claude-sonnet-4-6}"
+BASE_ENV="$(printf '"TRAINER_MODEL_ID":"%s","OTEL_SEMCONV_STABILITY_OPT_IN":"gen_ai_latest_experimental","OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT":"true"' "$MODEL_ID")"
 if [ -n "$BOSWELL_TOKEN" ] && [ "$BOSWELL_TOKEN" != "None" ]; then
-  ENV_JSON="$(printf '{"OTEL_SERVICE_NAME":"trainer-agent","OTEL_EXPORTER_OTLP_PROTOCOL":"http/protobuf","OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"%s","OTEL_EXPORTER_OTLP_HEADERS":"authorization=Bearer %s"}' \
-    "$BOSWELL_TRACES_URL" "$BOSWELL_TOKEN")"
-  ENV_ARGS=(--environment-variables "$ENV_JSON")
+  ENV_JSON="$(printf '{%s,"OTEL_SERVICE_NAME":"trainer-agent","OTEL_EXPORTER_OTLP_PROTOCOL":"http/protobuf","OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"%s","OTEL_EXPORTER_OTLP_HEADERS":"authorization=Bearer %s"}' \
+    "$BASE_ENV" "$BOSWELL_TRACES_URL" "$BOSWELL_TOKEN")"
   echo "== telemetry: routing prod traces through Boswell ($BOSWELL_TRACES_URL)"
 else
-  echo "== WARN: could not fetch Boswell ingest token; deploying WITHOUT telemetry env"
+  ENV_JSON="$(printf '{%s}' "$BASE_ENV")"
+  echo "== WARN: could not fetch Boswell ingest token; deploying with agent env but WITHOUT telemetry export"
 fi
+ENV_ARGS=(--environment-variables "$ENV_JSON")
+echo "== agent model: $MODEL_ID"
 
 # 5. AgentCore runtime (create or update) ------------------------------------
 EXISTING_ID="$(aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
