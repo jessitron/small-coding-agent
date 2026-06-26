@@ -18,16 +18,27 @@ BEARER="$(aws secretsmanager get-secret-value --secret-id "$SECRET_NAME" --regio
 SESSION_ID="${SESSION_ID:-trainer-agent-frontdoor-smoke-session-0001}"
 
 echo "== POST $FUNCTION_URL"
-reply="$(curl -fsS -XPOST "$FUNCTION_URL" \
+HDRS="$(mktemp)"
+reply="$(curl -fsS -D "$HDRS" -XPOST "$FUNCTION_URL" \
   -H "Authorization: Bearer $BEARER" \
   -H 'Content-Type: application/json' \
-  -d "{\"message\":\"hello from the frontdoor smoke\",\"session_id\":\"$SESSION_ID\"}")"
+  -H 'X-Trainer-Agent-Interface-Version: 2.0' \
+  -d "{\"message\":\"hello from the frontdoor smoke\",\"session_id\":\"$SESSION_ID\",\"seq\":1,\"state\":{}}")"
 echo "== response: $reply"
 
-if echo "$reply" | grep -q '"reply": "hi"'; then
-  echo "PASS"
+# Contract-shaped {reply,status} proves the auth + Lambda->AgentCore proxy works.
+# (Until the app adds trainer-agent/instructions.md the status is "error".)
+if echo "$reply" | grep -q '"status"' && echo "$reply" | grep -q '"reply"'; then
+  echo "PASS (contract-shaped reply)"
 else
-  echo "FAIL: unexpected reply"; exit 1
+  echo "FAIL: response not contract-shaped {reply,status}"; exit 1
+fi
+
+# Confirm the front door advertises interface version 2.0.
+if grep -qi '^x-trainer-agent-interface-version: 2.0' "$HDRS"; then
+  echo "PASS (advertises interface 2.0)"
+else
+  echo "FAIL: expected version header 2.0"; grep -i interface-version "$HDRS" || true; exit 1
 fi
 
 # Also confirm auth actually rejects a bad token (should be 401, not 200).

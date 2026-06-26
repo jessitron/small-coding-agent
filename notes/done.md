@@ -118,6 +118,14 @@ Completed landings, newest at the bottom. (In-repo tracking; see `SEAMAP.md` §T
     bare remote) PASS — branch really lands on origin.
   - Layer-3 container smoke PASS; image carries git 2.39 + gh 2.95. `deploy.sh` pins
     `TRAINER_MODEL_ID=us.anthropic.claude-sonnet-4-6` + GenAI capture env.
-  - **Not yet done:** deploy (service still advertises 1.0) + cloud smoke; the live
-    end-to-end needs the app to add `trainer-agent/instructions.md` and send
-    `seq`+`state` (JES-100 / JES-72).
+  - **Deployed v2.0 (2026-06-26):** runtime `trainer_agent-VyiY9TFdtC` (image
+    `:10c9748`) **and** the front-door Lambda, together (lockstep). Verified end to
+    end: `cloud-smoke.sh` and `frontdoor-smoke.sh` both return the honest
+    `status:error` — `trainer-agent/instructions.md not found in
+    jessitron/mtg-deck-shuffler` — which proves the live path: invoke → fetch PAT →
+    clone the real app repo → miss the brief → fail honestly. Front door advertises
+    interface `2.0` and still 401s a bad bearer. cloud/frontdoor smokes re-asserted
+    to contract-shape (the "hi" reply is retired).
+  - **Only blocker to a real PR:** the app must add `trainer-agent/instructions.md`
+    and send `seq`+`state` (JES-100 / JES-72). Then this same live path runs the
+    model and opens a PR.
