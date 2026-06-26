@@ -248,15 +248,13 @@ curl -sS -XPOST "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.o
 ### Local testing — the stub
 
 For local and CI testing you don't want the real agent (its latency, AWS, or a PR
-on every run). Run the **front-door stub**: a faithful stand-in that enforces the
-_same_ request contract as production (it shares the validation code, so it can't
-drift) but returns **canned** replies. Point your integration tests at it.
+on every run). Run the **front-door stub**: a stand-in that enforces the
+same request contract as production (as much as it can) but returns **canned** replies. Point your integration tests at it.
 
 The stub is a Docker image in private ECR. With AWS access to the account (the
-same access you used to fetch the token), the ECR login + `docker run` commands
-(repo URI included) are in the trainer-agent repo's
-[`notes/infrastructure.md`](https://github.com/jessitron/small-coding-agent/blob/main/notes/infrastructure.md)
-under "Front-door test stub". Run it with `-p 8080:8080 -e STUB_BEARER=test-token`.
+same access you used to fetch the token), you can get it.
+
+Run it with `-p 8080:8080 -e STUB_BEARER=test-token`.
 
 Now hit `http://localhost:8080/` exactly as you would the real endpoint, using
 `test-token` as the bearer. Health check: `GET /ping`. (Built from the
