@@ -251,14 +251,61 @@ For local and CI testing you don't want the real agent (its latency, AWS, or a P
 on every run). Run the **front-door stub**: a stand-in that enforces the
 same request contract as production (as much as it can) but returns **canned** replies. Point your integration tests at it.
 
-The stub is a Docker image in private ECR. With AWS access to the account (the
-same access you used to fetch the token), you can get it.
+The stub is a multi-arch (amd64+arm64) Docker image in **private ECR**:
 
-Run it with `-p 8080:8080 -e STUB_BEARER=test-token`.
+```
+414852377253.dkr.ecr.us-west-2.amazonaws.com/trainer-agent-frontdoor-stub:latest
+```
+
+(`latest` tracks the current interface version; images are also tagged by git
+sha. Built from the trainer-agent repo's `frontdoor/`.)
+
+**Pull + run it** (needs AWS access to the same account you used to fetch the
+token):
+
+```bash
+aws ecr get-login-password --profile sandbox --region us-west-2 \
+  | docker login --username AWS --password-stdin 414852377253.dkr.ecr.us-west-2.amazonaws.com
+
+docker run -p 8080:8080 -e STUB_BEARER=test-token \
+  414852377253.dkr.ecr.us-west-2.amazonaws.com/trainer-agent-frontdoor-stub:latest
+```
 
 Now hit `http://localhost:8080/` exactly as you would the real endpoint, using
-`test-token` as the bearer. Health check: `GET /ping`. (Built from the
-trainer-agent repo's `frontdoor/`; `latest` tracks the current interface version.)
+`test-token` as the bearer. Health check: `GET /ping`.
+
+#### Getting traces out of the stub (optional)
+
+The stub is **OpenTelemetry-instrumented**, just like the real front door: each
+request emits a `frontdoor-stub.invocation` span carrying `stub.faking=true` (so
+it's unmistakable in Honeycomb that this is the fake, not the real agent), plus
+`agent.message`/`agent.status`/`agent.reply`/`pr.url`, and it **joins your trace**
+via the `traceparent` header — so your app, the stub, and your handling of the
+reply land in one trace, mirroring the prod call path.
+
+It uses the **standard `OTEL_*` env vars** for export. **With none set the tracer
+is a no-op** (the stub still runs and `/ping` still works — you don't need a
+collector). To send spans somewhere, pass them through `-e` on `docker run`:
+
+```bash
+docker run -p 8080:8080 -e STUB_BEARER=test-token \
+  -e OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
+  -e OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.honeycomb.io/v1/traces \
+  -e 'OTEL_EXPORTER_OTLP_HEADERS=x-honeycomb-team=<YOUR_INGEST_KEY>' \
+  -e OTEL_SERVICE_NAME=trainer-agent-frontdoor-stub \
+  414852377253.dkr.ecr.us-west-2.amazonaws.com/trainer-agent-frontdoor-stub:latest
+```
+
+- **`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`** (or the broader
+  `OTEL_EXPORTER_OTLP_ENDPOINT`) — where to send spans. Point it at your own OTel
+  collector, or straight at Honeycomb as above. **Setting one of these is what
+  turns the tracer on.**
+- **`OTEL_EXPORTER_OTLP_PROTOCOL`** — the stub exports OTLP over **HTTP**, so use
+  `http/protobuf` (and an HTTP `/v1/traces` endpoint).
+- **`OTEL_EXPORTER_OTLP_HEADERS`** — auth for your backend (e.g. a Honeycomb
+  ingest key). **Secret — don't commit it.**
+- **`OTEL_SERVICE_NAME`** — defaults to `trainer-agent-frontdoor-stub` (its own
+  dataset); override if you want the stub's spans under your app's service.
 
 **What it enforces (real) vs. fakes:**
 
