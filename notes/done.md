@@ -81,3 +81,16 @@ Completed landings, newest at the bottom. (In-repo tracking; see `SEAMAP.md` §T
     `--invoked-via-function-url`) or it 403s silently with no logs; (2) AgentCore
     forwards only the `baggage` header to the container — NOT the `traceParent`
     param — so trace context to the agent rides in the **payload**, not headers.
+
+## 2026-06-25
+
+- **GitHub auth for the agent runtime (JES-106)** ← mountain: First PR from a script
+  - Fine-grained PAT in Secrets Manager (`trainer-agent/github-pat`); execution
+    role granted `GetSecretValue` (`GitHubPATSecretRead`, scoped to the secret).
+  - `src/agent/github_auth.py`: fetch PAT (env-first → Secrets Manager) and wire
+    git via a credential helper that reads `$GITHUB_TOKEN` — token never on disk,
+    in logs, or on a span; `gh` reads `$GH_TOKEN`. `.env` is the local fallback.
+  - `scripts/github-auth-smoke.py` (forces the Secrets Manager path, asserts the
+    token isn't written to git config) — verified PASS. boto3 → direct dep.
+  - Carved out: `git`/`gh` *binaries* install with their first consumers (clone =
+    JES-107, `gh` = JES-110/111). The auth code is done and shared by all three.
