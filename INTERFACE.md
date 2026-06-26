@@ -8,16 +8,12 @@
 **This is the single file you copy into another repo to learn how to work with
 the Trainer Agent.** It defines three interfaces at once:
 
-1. **Conceptual** — what the Trainer Agent is *for*, so an agent on the other
+1. **Conceptual** — what the Trainer Agent is _for_, so an agent on the other
    side can reason about what we're doing together. ([What this is](#what-this-is))
-2. **Collaboration** — how to ask for *changes to the Trainer Agent itself*, by
+2. **Collaboration** — how to ask for _changes to the Trainer Agent itself_, by
    filing development requests in Linear. ([Requesting development](#requesting-development-the-collaboration-interface))
-3. **Technical** — how to *call* the running agent over HTTP and render its
-   replies. ([Calling the agent](#calling-the-agent-the-technical-interface))
-
-These are not the same channel. You **call** the running service to get coding
-work done on your app; you **file a Linear issue** when the service itself needs
-to grow or change. Keep them straight and both stay healthy.
+3. **Technical** — how to _call_ the running agent over HTTP and render its
+   replies. ([Calling the agent](#calling-the-agent-the-technical-interface)), and how to test your integration.
 
 > **This doc is meant for Jessitron's projects.** The collaboration interface
 > assumes you track work in the shared Linear workspace (`honeycombio`) and can
@@ -42,7 +38,7 @@ chat UI. There is **one agent loop** — no separate chat vs. code modes. If it
 needs information at any point, even mid-coding, it returns a question instead of
 finishing; the next call resumes with its working tree intact.
 
-State (the conversation *and* the cloned working tree) lives **server-side**,
+State (the conversation _and_ the cloned working tree) lives **server-side**,
 keyed by the `session_id` you send — so you never resend history. Sessions are
 short-lived; it's acceptable for a session to expire between turns, and when that
 happens the agent makes it visible in both the chat reply and telemetry rather
@@ -51,14 +47,14 @@ than failing silently.
 **What "good" looks like** (so you can set expectations with your human):
 
 - **Honest** — confusion or a timed-out session shows up as a distinct `status`
-  (`asking` / `error`) in chat *and* as a marked span in Honeycomb. Never silent.
+  (`asking` / `error`) in chat _and_ as a marked span in Honeycomb. Never silent.
 - **Responsive** — chatting turns return in seconds.
 - **PRs land within ~15 minutes**, usually. A coding turn can take minutes.
 - **PRs are merge-worthy** — good enough to accept, not just to open.
 
 **Boundaries worth knowing:** one target repo, one PR per session,
 request/response only (no streaming). Observability is first-class — the whole
-call path is one trace (see [Trace propagation](#trace-propagation-recommended)).
+call path is one trace.
 
 ### What your repo provides: the agent's brief
 
@@ -74,7 +70,7 @@ conventions, and any helper scripts it should run (put those alongside it in
 `trainer-agent/`, e.g. `trainer-agent/cards.sh`, and point at them from the
 instructions). You own it and change it on your own schedule, in your own PRs — no
 Trainer-Agent deploy required. **If it's missing or empty, the agent returns
-`status: error` rather than guessing.** This is the division of labor: *this* doc
+`status: error` rather than guessing.** This is the division of labor: _this_ doc
 defines how to **call** the agent and use its tools; **your** `instructions.md`
 defines the **work**.
 
@@ -88,62 +84,28 @@ or the `state` you send.
 ## Requesting development (the collaboration interface)
 
 When you want the **Trainer Agent itself** to change — a new capability, a bug
-fix, a contract change in *this* repo (`small-coding-agent`), not in your app —
+fix, a contract change in _this_ repo (`small-coding-agent`), not in your app —
 you don't open a PR here and you don't change this doc. You **file a development
 request in Linear**, and the work gets picked up from there.
 
 **Coordinates:**
 
-| | |
-| --- | --- |
-| Workspace | `honeycombio` |
-| Team | `jessitron` |
-| Project | [`small-coding-agent`](https://linear.app/honeycombio/project/small-coding-agent-7218aea8c221) |
+|           |                                                                                                |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| Workspace | `honeycombio`                                                                                  |
+| Team      | `jessitron`                                                                                    |
+| Project   | [`small-coding-agent`](https://linear.app/honeycombio/project/small-coding-agent-7218aea8c221) |
 
 Both `mtg-deck-shuffler` and `small-coding-agent` track work in the same Linear
 team, **so the two agents can file issues for each other.** This is the channel
 for "I'm working in the app and I need the Trainer Agent to do X."
 
-### How to file one
-
-If you have the Linear MCP tools available (the server prefix varies by install —
-`mcp__linear-server__…`, `mcp__claude_ai_Linear__…`, etc.; search the bare
-operation name):
-
-```
-save_issue  team: "jessitron",
-            project: "small-coding-agent",
-            title: "<imperative summary>",
-            description: "<the body — see below>",
-            priority: <0-4 if known>
-```
-
-No MCP? File it by hand in the Linear web UI in the same team/project, or ask
-Jessitron to. A clear issue is the deliverable either way.
-
-### What makes a good request
-
-This agent (or Jessitron) reads the issue cold and acts on it, so write it to be
-acted on without a follow-up conversation:
-
-- **Title** — an imperative one-liner (`"Return a structured error when the clone fails"`).
-- **Why** — the user-facing reason. What are you trying to do in your app that
-  the current Trainer Agent makes hard or impossible?
-- **What you observed** — the concrete behavior today, with a `session_id` or a
-  Honeycomb trace link if you have one. (Both ends share Honeycomb team
-  `modernity` — a trace link is the strongest possible bug report.)
-- **What you want instead** — the change to the contract or behavior. If it
-  touches the technical interface below, say so explicitly — that's a
-  [version](#versioning) bump and needs coordinating.
-- **Search first.** Look for a near-duplicate open issue and add to it rather than
-  filing a second one.
-
 ---
 
 ## Calling the agent (the technical interface)
 
-Everything below is the wire contract. You need HTTPS + a bearer token to *call*
-it; you need AWS access once, to *fetch* the token.
+Everything below is the wire contract. You need HTTPS + a bearer token to _call_
+it; you need AWS access once, to _fetch_ the token.
 
 ### Endpoint
 
@@ -175,7 +137,13 @@ rotated.
 
 ### Request
 
-`Content-Type: application/json`. Body:
+Headers:
+
+`Content-Type: application/json`
+`X-Trainer-Agent-Interface-Version: 2.0`
+`traceparent: ...`
+
+Body:
 
 ```json
 {
@@ -199,7 +167,7 @@ rotated.
   conversation (see [Response](#response)). **Send it** so lost context is caught
   honestly instead of the agent acting on a deck it can no longer see.
 - **`state`** — the **current game state**, an object **you define**. The agent
-  passes it into its reasoning each turn; its shape is described by *your*
+  passes it into its reasoning each turn; its shape is described by _your_
   `trainer-agent/instructions.md`, not by this spec. Send it fresh each turn — the
   agent persists only its own conversation, not your game. Omit it only if your
   `instructions.md` says the agent doesn't need it.
@@ -227,12 +195,12 @@ rotated.
 
 ### Errors
 
-| HTTP | Body | Meaning |
-|------|------|---------|
-| 400 | `{"error":"invalid JSON body"}` | body wasn't valid JSON |
-| 400 | `{"error":"session_id required (>= 33 chars)"}` | missing/short `session_id` |
-| 401 | `{"error":"unauthorized"}` | missing/wrong bearer token |
-| 502 | `{"error":"agent invoke failed","detail":"..."}` | the agent runtime failed |
+| HTTP | Body                                             | Meaning                    |
+| ---- | ------------------------------------------------ | -------------------------- |
+| 400  | `{"error":"invalid JSON body"}`                  | body wasn't valid JSON     |
+| 400  | `{"error":"session_id required (>= 33 chars)"}`  | missing/short `session_id` |
+| 401  | `{"error":"unauthorized"}`                       | missing/wrong bearer token |
+| 502  | `{"error":"agent invoke failed","detail":"..."}` | the agent runtime failed   |
 
 ### Timeouts — set a long read timeout
 
@@ -277,59 +245,11 @@ curl -sS -XPOST "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.o
   -d '{"message":"Add a shuffle-animation toggle to the deck view","session_id":"mtg-deck-shuffler-3f9c1e6a-2b7d-4a55-9e21-abc123def456","seq":1,"state":{"deck_id":"boros-aggro","hand":["Mountain","Boros Charm"]}}'
 ```
 
-#### Python (with OTel propagation)
-
-```python
-import os, urllib.request, json
-from opentelemetry.propagate import inject  # if you use OTel
-
-URL = "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/"
-
-def ask_trainer(message: str, session_id: str, seq: int, state: dict) -> dict:
-    headers = {
-        "Authorization": f"Bearer {os.environ['TRAINER_AGENT_TOKEN']}",
-        "Content-Type": "application/json",
-        "X-Trainer-Agent-Interface-Version": "2.0",  # the version you built against
-    }
-    inject(headers)  # adds W3C `traceparent` so the trace continues into the agent
-    body = json.dumps(
-        {"message": message, "session_id": session_id, "seq": seq, "state": state}
-    ).encode()
-    req = urllib.request.Request(URL, data=body, headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=300) as resp:   # long timeout!
-        return json.loads(resp.read())
-```
-
-(A complete working reference client lives in the trainer-agent repo at
-`scripts/propagation_test.py`.)
-
-#### TypeScript / Node (fetch)
-
-```ts
-const URL = "https://3zpl56dwi54putsdjtecwnyqim0sdjmh.lambda-url.us-west-2.on.aws/";
-
-async function askTrainer(message: string, sessionId: string, seq: number, state: object) {
-  const res = await fetch(URL, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.TRAINER_AGENT_TOKEN}`,
-      "Content-Type": "application/json",
-      "X-Trainer-Agent-Interface-Version": "2.0", // the version you built against
-      // If you use OTel, inject `traceparent` here so the trace continues.
-    },
-    body: JSON.stringify({ message, session_id: sessionId, seq, state }),
-    signal: AbortSignal.timeout(300_000), // long timeout for coding turns
-  });
-  if (!res.ok) throw new Error(`trainer agent ${res.status}: ${await res.text()}`);
-  return res.json(); // { reply, status, pr_url? }
-}
-```
-
 ### Local testing — the stub
 
 For local and CI testing you don't want the real agent (its latency, AWS, or a PR
 on every run). Run the **front-door stub**: a faithful stand-in that enforces the
-*same* request contract as production (it shares the validation code, so it can't
+_same_ request contract as production (it shares the validation code, so it can't
 drift) but returns **canned** replies. Point your integration tests at it.
 
 The stub is a Docker image in private ECR. With AWS access to the account (the
@@ -351,12 +271,12 @@ trainer-agent repo's `frontdoor/`; `latest` tracks the current interface version
 - **Fakes — the reply**: no real agent, no AWS, no PR. `status` is driven by the
   message text so you can exercise each branch of your UI:
 
-  | message contains | canned response |
-  | --- | --- |
+  | message contains            | canned response                              |
+  | --------------------------- | -------------------------------------------- |
   | `open the pr` / `pr please` | `{ "status": "done", "pr_url": "…/pull/0" }` |
-  | `ask` | `{ "status": "asking" }` |
-  | `error` / `fail` | `{ "status": "error" }` |
-  | anything else | `{ "status": "chatting" }` |
+  | `ask`                       | `{ "status": "asking" }`                     |
+  | `error` / `fail`            | `{ "status": "error" }`                      |
+  | anything else               | `{ "status": "chatting" }`                   |
 
 - **Bearer**: set `STUB_BEARER` to whatever your tests use (default `stub-token`).
   This is a test token — **not** the real production secret.
@@ -367,13 +287,13 @@ trainer-agent repo's `frontdoor/`; `latest` tracks the current interface version
 
 This whole document is versioned `MAJOR.MINOR` (currently **2.0**) — **the version
 covers expectations, not just the wire bytes.** A change to what a consumer should
-*expect* — the conceptual framing, the collaboration convention, *or* the
+_expect_ — the conceptual framing, the collaboration convention, _or_ the
 technical contract — is a version bump. MAJOR when the change could confuse or
 break someone who built against the old version; MINOR for an addition that
 doesn't invalidate what they already understood. The doc and the running service
 bump together — this doc is the spec for the version it names at the top.
 
-(The runtime can only enforce the *technical* half — that's what the
+(The runtime can only enforce the _technical_ half — that's what the
 `X-Trainer-Agent-Interface-Version` header below carries. The conceptual and
 collaboration changes ride the same number so that one version describes one
 coherent set of expectations.)
@@ -383,7 +303,7 @@ coherent set of expectations.)
 - **You should declare yours** by sending the same header on each **request**, set
   to the version you built against.
 - **A mismatch is a warning, not an error.** The front door never rejects a
-  request over version; it records *both* versions on its trace span
+  request over version; it records _both_ versions on its trace span
   (`frontdoor.interface_version` = the service's,
   `frontdoor.client_interface_version` = yours). Drift is caught in Honeycomb, not
   at runtime. Sending the header is how you make that signal useful — if you omit
