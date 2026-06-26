@@ -119,6 +119,35 @@ Running log of choices made with Jessitron, newest at the bottom.
 - This doc "is meant for *my* projects" (Jessitron's) — the collaboration half
   assumes the shared `honeycombio` Linear workspace, not a public API.
 
+## 2026-06-25 — implementation choices while building the loop (JES-107–111)
+
+Three calls made during the build that refine or deviate from the earlier design:
+
+- **Custom workspace-scoped tools, not `strands_tools` built-ins.** The design doc
+  named `file_read`/`editor`/`shell` as Strands built-ins, but Strands *core* ships
+  no file/shell tools (verified against the installed 1.44.0). Rather than add the
+  separate `strands-agents-tools` package (whose `shell` isn't dir-scoped), we wrote
+  `src/agent/tools.py`: `read_file`/`write_file`/`list_dir`/`run_shell`, each closed
+  over the session's repo dir and refusing paths that escape it. This gives the
+  workspace-scoping the design wanted **without** a process-global `chdir` (unsafe in
+  a long-lived server). Some dogfooding value is lost (not the stock customer tools);
+  worth revisiting if that matters more than scoping.
+- **`seq` is enforced via an on-disk counter file, not by counting messages.** A
+  fresh/expired microVM has no `turns_seen` file → 0, which is exactly the
+  context-loss signal we want; counting `role==user` messages would miscount because
+  Strands appends tool *results* as user-role messages. The counter advances only on
+  a successful turn, so a retry with the same `seq` still lines up.
+- **Model pinned to `us.anthropic.claude-sonnet-4-6`** via `TRAINER_MODEL_ID`
+  (overridable), set in `deploy.sh`. Chosen from the inference profiles actually
+  available in the sandbox account; Strands' bare default id isn't guaranteed
+  invokable on Bedrock. The loop was verified end-to-end locally on the cheaper
+  `claude-haiku-4-5` profile.
+
+Verification reached: every layer **below deploy** is green — offline unit smokes,
+the real Bedrock loop (local), the v2.0 contract + stub, and the arm64 container
+(git + gh present). Deploy + cloud smoke + the live app round-trip remain (the last
+needs the app's `trainer-agent/instructions.md`, JES-100).
+
 ## 2026-06-25 — making the agent real: instructions-in-the-repo + the session protocol
 
 The agent is still the "hi" stub. This is the design for Mountain 2 (*First PR

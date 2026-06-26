@@ -94,3 +94,30 @@ Completed landings, newest at the bottom. (In-repo tracking; see `SEAMAP.md` §T
     token isn't written to git config) — verified PASS. boto3 → direct dep.
   - Carved out: `git`/`gh` *binaries* install with their first consumers (clone =
     JES-107, `gh` = JES-110/111). The auth code is done and shared by all three.
+
+- **The agent grew up: clone → loop → PR (JES-107–111)** ← mountain: First PR from a script
+  - **JES-107** `src/agent/workspace.py`: per-session `ensure_clone()` (clone once,
+    reuse the warm clone) + `load_instructions()` (`trainer-agent/instructions.md`;
+    missing/empty → honest `WorkspaceError`). `git` added to the image. Offline
+    `scripts/workspace-smoke.py` PASS.
+  - **JES-108** real Strands loop replaces "hi": `src/agent/loop.py` assembles the
+    prompt (tool-usage guide this repo owns + the app's brief) + message + state,
+    runs one Strands turn, persists conversation per `session_id` (FileSessionManager).
+    `src/agent/tools.py` workspace-scoped `read_file/write_file/list_dir/run_shell`.
+    Strands reuses our global OTel provider; GenAI content-capture env set pre-import.
+    `scripts/loop-smoke.py` (real Bedrock, haiku) PASS — turn 1 used a tool, turn 2
+    recalled turn 1 (persistence).
+  - **JES-109** wire contract → **2.0**: request gains `seq` + `state`; agent enforces
+    `seq == turns_seen+1` via an on-disk counter (absent on a fresh VM = the
+    context-loss signal) → honest `status:error` + marked span. Front door forwards
+    the fields; stub + `INTERFACE.md` bumped to 2.0. `scripts/contract-smoke.py` +
+    `stub-smoke.sh` PASS.
+  - **JES-110/111** `open_pr` (branch→commit→push→`gh pr create`, returns URL, marks
+    `status:done`+`pr_url`) and `request_app_change` (files a GitHub issue on the app
+    repo). `gh` added to the image. Offline `scripts/pr-tools-smoke.py` (fake `gh` +
+    bare remote) PASS — branch really lands on origin.
+  - Layer-3 container smoke PASS; image carries git 2.39 + gh 2.95. `deploy.sh` pins
+    `TRAINER_MODEL_ID=us.anthropic.claude-sonnet-4-6` + GenAI capture env.
+  - **Not yet done:** deploy (service still advertises 1.0) + cloud smoke; the live
+    end-to-end needs the app to add `trainer-agent/instructions.md` and send
+    `seq`+`state` (JES-100 / JES-72).
